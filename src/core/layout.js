@@ -35,8 +35,9 @@ export const ROOM_ORIGIN = new Vector3(-BUILD_LINE, FLOOR_Y, BUILD_LINE);
 
 export const CAMERA = {
   // room-local position (x: 0 at the east glass, z: 0 at the north glass)
-  position: new Vector3(-4.5, 1.42, 4.35),
-  // world-space look-at target (just above the middle of the intersection)
-  target: new Vector3(0, 3.2, 0),
-  fov: 50,
+  // standing height, a few steps back from the window table for two
+  position: new Vector3(-3.15, 1.52, 3.25),
+  // world-space look-at target: the shop fronts across the avenue, seen from above
+  target: new Vector3(-12.6, 2.3, -11),
+  fov: 52,
 };

@@ -327,14 +327,11 @@ export function buildRoom() {
     table(x, 0.82);
     chair(x + 0.56, 0.84, -Math.PI / 2 + (i === 0 ? 0.25 : -0.12));
     chair(x - 0.56, 0.8, Math.PI / 2 + (i === 1 ? 0.3 : 0.08));
-    vase(x + 0.05, TABLE_TOP, 0.66, i === 1 ? M.stoneware : M.porcelain, i * 2.3 + 1);
+    if (i !== 1) vase(x + 0.05, TABLE_TOP, 0.66, M.porcelain, i * 2.3 + 1);
   });
-  // the table closest to the viewer: somebody's seat, but nobody is here
-  const tx = -3.72;
-  const tz = 2.95;
-  table(tx, tz);
-  chair(tx - 0.1, tz - 0.6, 0.18);
-  chair(tx + 0.62, tz + 0.2, -Math.PI / 2 - 0.5);
+  // the table for two the camera faces: a coffee left on it, but nobody is here
+  const tx = windowTables[1];
+  const tz = 0.82;
   cup(tx + 0.08, TABLE_TOP, tz + 0.1, group, { filled: true, rot: 0.7 });
   const spoon = stick(v(tx + 0.17, TABLE_TOP + 0.012, tz + 0.13), v(tx + 0.2, TABLE_TOP + 0.013, tz + 0.03), 0.0022, M.steel);
   spoon.castShadow = false;
@@ -646,7 +643,6 @@ export function buildRoom() {
     m.renderOrder = 1;
   };
   for (const x of windowTables) blob(1.9, 1.0, x, 0.82, 0.42);
-  blob(1.5, 1.5, tx + 0.1, tz - 0.1, 0.45);
   blob(1.3, cz1 - cz0 + 0.7, (cx0 + cx1) / 2 - 0.1, (cz0 + cz1) / 2, 0.7);
   blob(1.0, bz1 - bz0 + 0.5, (bx0 + bx1) / 2 - 0.1, (bz0 + bz1) / 2, 0.6);
   blob(0.6, 0.6, -1.78, 2.02, 0.5);
