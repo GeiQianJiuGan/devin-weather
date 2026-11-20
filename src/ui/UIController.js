@@ -139,9 +139,9 @@ export class UIController {
       this.toggle({ label: 'Rain on glass', path: 'scene.windowCondensation' }),
       this.toggle({ label: 'Vehicle traffic', path: 'scene.trafficEnabled' }),
       this.slider({ label: 'Traffic density', path: 'scene.trafficDensity' }),
-      this.toggle({ label: 'Interior lighting', path: 'scene.interiorLightEnabled' }),
-      this.toggle({ label: 'Desk lamp', path: 'scene.deskLampEnabled' }),
-      this.slider({ label: 'Screen brightness', path: 'scene.computerScreenBrightness' }),
+      this.toggle({ label: 'Pendant lights', path: 'scene.interiorLightEnabled' }),
+      this.toggle({ label: 'Table lamp', path: 'scene.deskLampEnabled' }),
+      this.slider({ label: 'Menu display', path: 'scene.computerScreenBrightness' }),
     );
 
     this.pauseButton = this.button('Pause', () => store.set('playback.paused', !store.get('playback.paused')), 'primary');

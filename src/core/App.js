@@ -1,6 +1,7 @@
 import {
   HalfFloatType,
   NoToneMapping,
+  PMREMGenerator,
   PCFShadowMap,
   PerspectiveCamera,
   Scene,
@@ -16,6 +17,7 @@ import { VehicleFleet } from '../city/Vehicles.js';
 import { ExteriorPipeline } from '../render/ExteriorPipeline.js';
 import { FullscreenPass } from '../render/FullscreenPass.js';
 import { PostFX } from '../render/PostFX.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildRoom } from '../room/RoomBuilder.js';
 import { WindowGlass } from '../room/WindowGlass.js';
 import { SkyDome } from '../sky/SkyDome.js';
@@ -33,11 +35,11 @@ const VEHICLE_POOL = 64;
 const BASE_ASPECT = 16 / 9;
 
 /**
- * Scene manager: owns the renderer, both scenes (city outside / bedroom
+ * Scene manager: owns the renderer, both scenes (city outside / cafe
  * inside), every simulation system and the frame loop.
  *
  * Frame: update systems -> render the city into its own HDR target ->
- * blur / halo passes -> render the bedroom (its glass composites the city) ->
+ * blur / halo passes -> render the cafe (its glass composites the city) ->
  * bloom + tone mapping to the screen.
  */
 export class App {
@@ -89,12 +91,17 @@ export class App {
       ...this.rain.meshes, ...this.snow.meshes,
     ];
 
-    // --- bedroom (interior scene) -------------------------------------------------------
+    // --- cafe (interior scene) -------------------------------------------------------
     this.interiorScene = new Scene();
     this.room = buildRoom();
     this.glass = new WindowGlass();
     this.room.group.add(...this.glass.meshes);
     this.interiorScene.add(this.room.group);
+    // a neutral studio probe so the steel, brass, marble and glazed ceramics have something to reflect
+    const pmrem = new PMREMGenerator(this.renderer);
+    this.interiorScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.interiorScene.environmentIntensity = 0;
+    pmrem.dispose();
 
     // --- systems ------------------------------------------------------------------------------
     this.time = new TimeSystem(store);
@@ -251,6 +258,7 @@ export class App {
     this.traffic.setEnabled(state.scene.trafficEnabled);
     this.traffic.setDensity(state.scene.trafficDensity / 100);
     this.lighting.update(dt, simDt, this.time.env, this.weather, this.lightning, state);
+    this.interiorScene.environmentIntensity = 0.015 + this.room.lights.fill.intensity * 0.6;
     this.traffic.update(simDt);
 
     this.rain.update(simDt, wx.rain, wind.x, wind.z);
@@ -288,7 +296,7 @@ export class App {
       mist: lighting.mistActive, halo: lighting.haloActive, scatter: lighting.scatter,
       haloThreshold: lighting.haloThreshold, haloKnee: 0.5,
     });
-    // 3. the bedroom; the glass panes composite the exterior textures
+    // 3. the cafe; the glass panes composite the exterior textures
     r.shadowMap.needsUpdate = lighting.interiorShadowsDirty;
     lighting.interiorShadowsDirty = false;
     r.setRenderTarget(this.post.target);

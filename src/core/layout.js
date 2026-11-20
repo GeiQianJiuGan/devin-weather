@@ -19,23 +19,23 @@ export const STOP_FAR = ROAD_HALF + 5.0;
 export const ROAD_LENGTH = 320;
 export const GROUND_SIZE = 1400;
 
-// The apartment sits on the first floor above the shops of the south-west
-// block. Its glass corner is the building corner closest to the intersection.
+// The cafe occupies the first floor above the shops of the south-west block.
+// Its glass corner is the building corner closest to the intersection.
 export const FLOOR_Y = 3.1;
 export const ROOM = {
-  w: 5.6, // extent along -X from the east glass
-  d: 4.2, // extent along +Z from the north glass
-  h: 3.0,
-  glassNorth: 5.1, // glazed length of the north wall, starting at the corner
-  glassEast: 3.6, // glazed length of the east wall, starting at the corner
-  glassY0: 0.08,
-  glassY1: 2.82,
+  w: 8.4, // extent along -X from the east glass
+  d: 7.0, // extent along +Z from the north glass
+  h: 3.4,
+  glassNorth: 6.6, // glazed length of the north wall, starting at the corner
+  glassEast: 5.0, // glazed length of the east wall, starting at the corner
+  glassY0: 0.06,
+  glassY1: 3.0,
 };
 export const ROOM_ORIGIN = new Vector3(-BUILD_LINE, FLOOR_Y, BUILD_LINE);
 
 export const CAMERA = {
   // room-local position (x: 0 at the east glass, z: 0 at the north glass)
-  position: new Vector3(-3.7, 1.5, 2.85),
+  position: new Vector3(-4.5, 1.42, 4.35),
   // world-space look-at target (just above the middle of the intersection)
   target: new Vector3(0, 3.2, 0),
   fov: 50,

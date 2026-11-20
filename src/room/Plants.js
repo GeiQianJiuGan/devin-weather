@@ -24,9 +24,10 @@ import { Rng } from '../core/utils.js';
 
 function broadLeafTexture() {
   const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 256;
+  c.width = 512;
+  c.height = 1024;
   const g = c.getContext('2d');
+  g.scale(4, 4);
   const grad = g.createLinearGradient(0, 0, 128, 0);
   grad.addColorStop(0, '#2c5a27');
   grad.addColorStop(0.5, '#3f7a35');
@@ -56,7 +57,7 @@ function broadLeafTexture() {
   g.stroke();
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 16;
   return t;
 }
 
@@ -81,7 +82,7 @@ function bladeTexture() {
   g.fillRect(59, 0, 5, 256);
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 16;
   return t;
 }
 

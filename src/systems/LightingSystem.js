@@ -14,7 +14,7 @@ const FLASH_COLOR = new Color(0.72, 0.8, 1.0);
 const CITY_GLOW = new Color(0.022, 0.016, 0.012);
 const WARM = new Color(1.0, 0.78, 0.56);
 const LAMP_WARM = new Color(1.0, 0.72, 0.42);
-const SCREEN_COOL = new Color(0.72, 0.85, 1.0);
+const SCREEN_COOL = new Color(1.0, 0.9, 0.76);
 
 const _a = new Color();
 const _b = new Color();
@@ -234,19 +234,22 @@ export class LightingSystem {
 
     L.fill.color.copy(WARM).lerp(_d.copy(ambient).multiplyScalar(1 / Math.max(luminance(ambient), 1e-3)), 0.5 * clamp(lum, 0, 1));
     L.fill.intensity = 0.03 + 0.22 * clamp(lum, 0, 1) + 0.1 * lv.interior + 0.03 * lv.lamp + flash * 0.12;
-    L.ceiling.intensity = 2.6 * lv.interior;
+    L.ceiling.intensity = 2.4 * lv.interior;
+    L.pendants.intensity = 2.0 * lv.interior;
     this.room.fixtureMaterial.color.copy(WARM).multiplyScalar(0.04 + 9 * lv.interior);
-    L.lamp.intensity = 2.4 * lv.lamp;
+    this.room.globeMaterial.color.copy(WARM).multiplyScalar(0.12 + 0.2 * clamp(lum, 0, 1) + 2.2 * lv.interior);
+    this.room.domeInnerMaterial.color.copy(WARM).multiplyScalar(0.03 + 1.6 * lv.interior);
+    L.lamp.intensity = 1.5 * lv.lamp;
     this.room.bulbMaterial.color.copy(LAMP_WARM).multiplyScalar(0.03 + 30 * lv.lamp);
     this.room.lampGlowMaterial.color.copy(LAMP_WARM).multiplyScalar(0.02 + 3.5 * lv.lamp);
 
     // monitor: dims itself a little in a dark room, but is always a cool light source
     const screenPower = lv.screen * lerp(0.72, 1, clamp(lum, 0, 1));
-    this.room.screenMaterial.color.setScalar(0.03 + 2.3 * screenPower);
+    this.room.screenMaterial.color.setScalar(0.03 + 1.5 * screenPower);
     L.monitorLight.color.copy(SCREEN_COOL);
-    L.monitorLight.intensity = 2.8 * screenPower;
+    L.monitorLight.intensity = 1.6 * screenPower;
     L.monitorPoint.color.copy(SCREEN_COOL);
-    L.monitorPoint.intensity = 0.7 * screenPower;
+    L.monitorPoint.intensity = 0.4 * screenPower;
 
     // --- glass composite ----------------------------------------------------------------
     const gu = this.glass.uniforms;

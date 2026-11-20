@@ -42,13 +42,13 @@ function streetlightLayout() {
   return out.sort((a, b) => a.dist - b.dist);
 }
 
-// Mast arms: one per approach, two heads each (far-side, except the southbound one).
+// Mast arms: one per approach on its own corner pole, two far-side heads each.
 // approach 0: eastbound, 1: northbound, 2: westbound, 3: southbound
 const MASTS = [
   { approach: 0, pole: [9.0, 9.4], arm: [0, -1], armLen: 8.7, heads: [[9.0, 5.25], [9.0, 1.75]], face: [-1, 0] },
   { approach: 1, pole: [9.4, -9.0], arm: [-1, 0], armLen: 8.7, heads: [[5.25, -9.0], [1.75, -9.0]], face: [0, 1] },
   { approach: 2, pole: [-9.2, -9.2], arm: [0, 1], armLen: 8.5, heads: [[-9.2, -5.25], [-9.2, -1.75]], face: [1, 0] },
-  { approach: 3, pole: [-9.2, -9.2], arm: [1, 0], armLen: 8.5, heads: [[-5.25, -9.2], [-1.75, -9.2]], face: [0, -1] },
+  { approach: 3, pole: [-9.2, 9.5], arm: [1, 0], armLen: 8.5, heads: [[-5.25, 9.5], [-1.75, 9.5]], face: [0, -1] },
 ];
 const MAST_H = 7.3;
 const HEAD_Y = 6.55;
