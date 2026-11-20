@@ -63,9 +63,10 @@ function barkTexture() {
 function sprigTexture() {
   const S = 256;
   const c = document.createElement('canvas');
-  c.width = S;
-  c.height = S;
+  c.width = S * 4;
+  c.height = S * 4;
   const g = c.getContext('2d');
+  g.scale(4, 4);
   const rng = new Rng(5);
   const leaf = (x, y, rot, len, wid, light) => {
     g.save();
@@ -80,18 +81,34 @@ function sprigTexture() {
     g.bezierCurveTo(len * 0.25, -wid, len * 0.7, -wid * 0.9, len, 0);
     g.bezierCurveTo(len * 0.7, wid * 0.9, len * 0.25, wid, 0, 0);
     g.fill();
-    g.strokeStyle = 'rgba(235,245,215,0.55)';
-    g.lineWidth = 1.2;
+    // darker rim so neighbouring leaves stay separate, then midrib and side veins
+    g.strokeStyle = 'rgba(70,92,48,0.75)';
+    g.lineWidth = 0.9;
+    g.stroke();
+    g.strokeStyle = 'rgba(235,245,215,0.6)';
+    g.lineWidth = 0.9;
     g.beginPath();
     g.moveTo(0, 0);
     g.lineTo(len * 0.94, 0);
+    g.stroke();
+    g.strokeStyle = 'rgba(225,238,200,0.32)';
+    g.lineWidth = 0.45;
+    g.beginPath();
+    for (let v = 1; v <= 5; v++) {
+      const vx = (len * v) / 6.4;
+      const reach = wid * 0.72 * Math.sin((v / 6.4) * Math.PI);
+      g.moveTo(vx, 0);
+      g.lineTo(vx + len * 0.1, -reach);
+      g.moveTo(vx, 0);
+      g.lineTo(vx + len * 0.1, reach);
+    }
     g.stroke();
     g.restore();
   };
   for (let twig = 0; twig < 5; twig++) {
     const a0 = (twig / 5) * Math.PI * 2 + rng.range(-0.3, 0.3);
     g.strokeStyle = 'rgba(92,78,60,1)';
-    g.lineWidth = 2.5;
+    g.lineWidth = 2.2;
     g.beginPath();
     g.moveTo(S / 2, S / 2);
     g.lineTo(S / 2 + Math.cos(a0) * 78, S / 2 + Math.sin(a0) * 78);
@@ -101,14 +118,14 @@ function sprigTexture() {
       const side = k % 2 === 0 ? 1 : -1;
       leaf(
         S / 2 + Math.cos(a0) * d, S / 2 + Math.sin(a0) * d,
-        a0 + side * rng.range(0.5, 1.15), rng.range(38, 56), rng.range(13, 19), rng.range(0, 1),
+        a0 + side * rng.range(0.5, 1.15), rng.range(34, 48), rng.range(10, 14), rng.range(0, 1),
       );
     }
-    leaf(S / 2 + Math.cos(a0) * 80, S / 2 + Math.sin(a0) * 80, a0 + rng.range(-0.2, 0.2), 46, 16, 0.8);
+    leaf(S / 2 + Math.cos(a0) * 80, S / 2 + Math.sin(a0) * 80, a0 + rng.range(-0.2, 0.2), 42, 12, 0.8);
   }
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 16;
   return t;
 }
 
@@ -148,7 +165,7 @@ function growTree(seed) {
 
   const grow = (start, dir, length, r0, depth) => {
     const steps = depth === 0 ? 6 : depth === 1 ? 5 : 4;
-    const r1 = depth === 3 ? 0.012 : r0 * 0.62;
+    const r1 = depth === 3 ? 0.016 : r0 * 0.64;
     const bend = depth === 0 ? 0.06 : 0.24;
     const path = [];
     let pos = start;
@@ -209,12 +226,12 @@ function growTree(seed) {
   const DARK = [0.075, 0.14, 0.05];
   const LIGHT = [0.3, 0.44, 0.13];
   for (const a of anchors) {
-    for (let k = 0; k < 7; k++) {
-      const c = [a[0] + rng.range(-0.55, 0.55), a[1] + rng.range(-0.4, 0.5), a[2] + rng.range(-0.55, 0.55)];
+    for (let k = 0; k < 9; k++) {
+      const c = [a[0] + rng.range(-0.5, 0.5), a[1] + rng.range(-0.35, 0.45), a[2] + rng.range(-0.5, 0.5)];
       const out = norm([c[0] - centre[0], c[1] - centre[1] + 0.6, c[2] - centre[2]]);
       const face = norm([out[0] * 0.7 + rng.range(-0.9, 0.9), out[1] * 0.7 + rng.range(-0.5, 0.9), out[2] * 0.7 + rng.range(-0.9, 0.9)]);
       const [u, v] = basis(face);
-      const s = rng.range(0.42, 0.72);
+      const s = rng.range(0.34, 0.56);
       const rot = rng.range(0, Math.PI * 2);
       const cu = Math.cos(rot) * s;
       const su = Math.sin(rot) * s;
@@ -264,7 +281,7 @@ transformed.z += (cos(swayPhase * 0.8 + position.y * 0.6) * 0.04 + sin(swayPhase
 
 function leafMaterial() {
   const material = new MeshStandardMaterial({
-    map: sprigTexture(), alphaTest: 0.4, side: DoubleSide, vertexColors: true, roughness: 0.72, metalness: 0,
+    map: sprigTexture(), alphaTest: 0.45, side: DoubleSide, vertexColors: true, roughness: 0.72, metalness: 0,
   });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = ext.uTime;

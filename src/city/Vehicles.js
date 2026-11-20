@@ -389,29 +389,90 @@ function addLamps(b, front, back) {
 
 const BUS = { length: 11.6, width: 2.54, height: 3.05 };
 
+// Low-floor city bus: raked windscreen with a destination display, a continuous
+// glazed band, two double doors on the kerb side, roof pods, mirrors and wheel arches.
 function busGeometry() {
   const b = new PartBuilder();
   const hw = BUS.width / 2;
   const x0 = -BUS.length / 2;
   const x1 = BUS.length / 2;
-  const skirt = b.frustum(0.32, 1.25, [x0 + 0.05, x1 - 0.05, -hw + 0.04, hw - 0.04], [x0, x1, -hw, hw], PART.PAINT);
-  const body = b.frustum(1.25, BUS.height, [x0, x1, -hw, hw], [x0 + 0.08, x1 - 0.25, -hw + 0.06, hw - 0.06], PART.PAINT, { noBottom: true });
-  const panes = 8;
-  for (let i = 0; i < panes; i++) {
-    const a = 0.03 + (i * 0.94) / panes;
-    const c = a + 0.94 / panes - 0.012;
-    b.panel(body.right, a, c, 0.1, 0.62, PART.CABIN);
-    b.panel(body.left, 1 - c, 1 - a, 0.1, 0.62, PART.CABIN);
+  const belt = 1.22;
+  const eave = 2.62;
+  const top = BUS.height;
+  // tucked-in sill, body side, glazed band, cambered roof (each ring a little rounder than a box)
+  b.frustum(0.3, 0.46, [x0 + 0.1, x1 - 0.1, -hw + 0.1, hw - 0.1], [x0 + 0.02, x1 - 0.02, -hw, hw], PART.TRIM);
+  const lower = b.frustum(0.46, belt, [x0 + 0.02, x1 - 0.02, -hw, hw], [x0, x1 - 0.02, -hw, hw], PART.PAINT, { noBottom: true });
+  const band = b.frustum(belt, eave, [x0, x1 - 0.02, -hw, hw], [x0 + 0.03, x1 - 0.3, -hw + 0.035, hw - 0.035], PART.PAINT, { noBottom: true });
+  const cant = b.frustum(eave, top - 0.1, [x0 + 0.03, x1 - 0.3, -hw + 0.035, hw - 0.035], [x0 + 0.1, x1 - 0.42, -hw + 0.17, hw - 0.17], PART.PAINT, { noBottom: true });
+  b.frustum(top - 0.1, top, [x0 + 0.1, x1 - 0.42, -hw + 0.17, hw - 0.17], [x0 + 0.3, x1 - 0.7, -hw + 0.42, hw - 0.42], PART.PAINT, { noBottom: true });
+  // roof pods: air conditioning and battery / gas pack
+  b.frustum(top - 0.02, top + 0.26, [-1.6, 1.3, -0.82, 0.82], [-1.45, 1.1, -0.72, 0.72], PART.HUB, { noBottom: true });
+  b.frustum(top - 0.02, top + 0.2, [-4.6, -2.5, -0.78, 0.78], [-4.5, -2.6, -0.7, 0.7], PART.HUB, { noBottom: true });
+
+  // side glazing: one dark ribbon, split by slim pillars, with a body-colour waist stripe below
+  const L = BUS.length;
+  const sAt = (x) => (x - x0) / L; // 0 at the tail on the right face
+  const doors = [[3.85, 5.15], [-0.9, 0.5]]; // kerb side (+Z), x ranges
+  for (const side of ['right', 'left']) {
+    const flip = (s) => (side === 'right' ? 1 - s : s);
+    const span = (face, xa, xb, t0, t1, part, lift) => {
+      const sa = flip(sAt(xa));
+      const sb = flip(sAt(xb));
+      b.panel(face[side], Math.min(sa, sb), Math.max(sa, sb), t0, t1, part, lift);
+    };
+    span(band, x0 + 0.25, x1 - 0.45, 0.06, 0.93, PART.CABIN, 0.012);
+    for (let x = x0 + 1.6; x < x1 - 1.2; x += 1.52) span(band, x - 0.035, x + 0.035, 0.06, 0.93, PART.TRIM, 0.02);
+    span(band, x0 + 0.25, x1 - 0.45, 0.6, 0.63, PART.TRIM, 0.02); // hopper window rail
+    span(lower, x0 + 0.1, x1 - 0.1, 0.84, 0.97, PART.HUB, 0.012);
+    span(lower, x0 + 0.1, x1 - 0.1, 0.0, 0.1, PART.TRIM, 0.012);
+    if (side === 'right') {
+      for (const [xa, xb] of doors) {
+        span(lower, xa - 0.05, xb + 0.05, 0.02, 1.0, PART.TRIM, 0.016);
+        span(band, xa - 0.05, xb + 0.05, 0.0, 0.97, PART.TRIM, 0.022);
+        const mid = (xa + xb) / 2;
+        for (const [da, db] of [[xa, mid - 0.025], [mid + 0.025, xb]]) {
+          span(lower, da, db, 0.08, 0.98, PART.GLASS, 0.024);
+          span(band, da, db, 0.0, 0.93, PART.GLASS, 0.03);
+        }
+      }
+    } else {
+      span(lower, 1.2, 1.9, 0.3, 0.7, PART.TRIM, 0.016); // service flap
+      span(band, x1 - 1.5, x1 - 0.5, 0.06, 0.93, PART.GLASS, 0.02); // driver's window
+    }
   }
-  b.panel(body.front, 0.05, 0.95, 0.02, 0.66, PART.GLASS);
-  b.panel(body.front, 0.2, 0.8, 0.72, 0.9, PART.SIGN);
-  b.panel(body.back, 0.1, 0.9, 0.25, 0.62, PART.CABIN);
-  b.panel(skirt.right, 0.0, 1.0, 0.0, 0.3, PART.TRIM, 0.01);
-  b.panel(skirt.left, 0.0, 1.0, 0.0, 0.3, PART.TRIM, 0.01);
-  addLamps(b, skirt.front, skirt.back);
-  for (const wx of [-3.7, 3.6]) {
-    b.wheel(wx, 0.5, hw - 0.12, 0.5, 0.14, 1);
-    b.wheel(wx, 0.5, -hw + 0.12, 0.5, 0.14, -1);
+  // front: deep windscreen, destination display, bumper and lamps
+  b.panel(band.front, 0.04, 0.96, 0.0, 0.94, PART.GLASS, 0.014);
+  b.panel(lower.front, 0.04, 0.96, 0.62, 1.0, PART.GLASS, 0.014);
+  b.panel(band.front, 0.495, 0.505, 0.0, 0.94, PART.TRIM, 0.02);
+  b.panel(cant.front, 0.12, 0.88, 0.08, 0.9, PART.SIGN, 0.014);
+  b.panel(band.front, 0.14, 0.86, 0.78, 0.93, PART.SIGN, 0.02);
+  b.panel(lower.front, 0.0, 1.0, 0.0, 0.22, PART.TRIM, 0.03);
+  b.panel(lower.front, 0.3, 0.7, 0.26, 0.5, PART.TRIM, 0.016);
+  b.panel(lower.front, 0.03, 0.2, 0.28, 0.52, PART.HEAD);
+  b.panel(lower.front, 0.8, 0.97, 0.28, 0.52, PART.HEAD);
+  b.panel(lower.front, 0.03, 0.2, 0.54, 0.6, PART.BLINK_L);
+  b.panel(lower.front, 0.8, 0.97, 0.54, 0.6, PART.BLINK_R);
+  // rear: window, engine louvres, light clusters
+  b.panel(band.back, 0.08, 0.92, 0.2, 0.9, PART.CABIN);
+  b.panel(cant.back, 0.2, 0.8, 0.15, 0.85, PART.SIGN, 0.014);
+  b.panel(lower.back, 0.0, 1.0, 0.0, 0.2, PART.TRIM, 0.03);
+  for (let k = 0; k < 5; k++) b.panel(lower.back, 0.25, 0.75, 0.3 + k * 0.12, 0.36 + k * 0.12, PART.TRIM, 0.016);
+  b.panel(lower.back, 0.03, 0.2, 0.55, 0.95, PART.TAIL);
+  b.panel(lower.back, 0.8, 0.97, 0.55, 0.95, PART.TAIL);
+  b.panel(lower.back, 0.03, 0.2, 0.42, 0.53, PART.BLINK_R);
+  b.panel(lower.back, 0.8, 0.97, 0.42, 0.53, PART.BLINK_L);
+  // mirrors on arms
+  for (const side of [-1, 1]) {
+    const z = side * (hw + 0.2);
+    b.frustum(2.28, 2.34, [x1 - 0.2, x1 + 0.22, Math.min(z, side * hw) , Math.max(z, side * hw)], [x1 - 0.2, x1 + 0.22, Math.min(z, side * hw), Math.max(z, side * hw)], PART.TRIM);
+    b.frustum(1.78, 2.3, [x1 + 0.14, x1 + 0.26, z - 0.1, z + 0.1], [x1 + 0.14, x1 + 0.26, z - 0.1, z + 0.1], PART.TRIM);
+  }
+  const R = 0.49;
+  for (const wx of [-3.15, 3.0]) {
+    for (const side of [-1, 1]) {
+      b.arch(wx, R, side * (hw + 0.004), R * 1.2, 0.34, side);
+      b.wheel(wx, R, side * (hw - 0.14), R, 0.15, side);
+    }
   }
   return b.build();
 }

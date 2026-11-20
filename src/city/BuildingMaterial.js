@@ -119,7 +119,10 @@ float bGlass = 0.0;
     vec2 dd = abs(fc - 0.5) - 0.5 * vBStyle.zw;
     float win = (1.0 - smoothstep(-aa.x, aa.x, dd.x)) * (1.0 - smoothstep(-aa.y, aa.y, dd.y)) * inFloors;
     float lod = smoothstep(0.25, 0.9, max(gfw.x, gfw.y));
-    float winL = mix(win, vBStyle.z * vBStyle.w * inFloors, lod);
+    // far away the columns merge first: keep the floor bands readable for much longer than the single windows
+    float lodY = smoothstep(0.3, 1.0, gfw.y);
+    float rowWin = (1.0 - smoothstep(-aa.y, aa.y, dd.y)) * vBStyle.z * inFloors;
+    float winL = mix(win, mix(rowWin, vBStyle.z * vBStyle.w * inFloors, lodY), lod);
 
     vec3 r = bHash3(id + vec2(seed * 17.0 + faceId * 31.0, seed * 7.0));
     float rowR = bHash(vec2(id.y, seed * 5.0 + faceId));
@@ -135,13 +138,26 @@ float bGlass = 0.0;
     float inner = 0.78 + 0.22 * bNoise(fc * vec2(3.0, 5.0) + id * 1.7);
     float mull = 1.0 - (1.0 - smoothstep(0.012, 0.03, abs(fc.x - 0.5))) * step(0.45, vBStyle.z) * (1.0 - lod);
     vec3 emitWin = lc * (0.25 + 0.9 * r.z * r.z) * inner * isLit * uWindowGain * mull;
-    vec3 emitAvg = mix(warm, cool, office * 0.7) * 0.55 * litP * uWindowGain;
+    float rowLit = mix(0.35, 1.5, step(1.0 - litP, rowR)) * mix(0.75, 1.25, bHash(vec2(id.y * 3.0 + faceId, seed)));
+    vec3 emitAvg = mix(warm, cool, office * 0.7) * 0.55 * litP * uWindowGain * mix(rowLit, 1.0, lodY);
     bEmit = mix(emitWin, emitAvg, lod) * winL;
 
     vec3 wall = vBTint * (0.9 + 0.2 * wn) * (0.94 + 0.12 * bHash(id + seed) * (1.0 - lod));
     float slab = (1.0 - smoothstep(0.02, 0.05, fc.y)) * inFloors * (1.0 - lod);
     wall *= 1.0 - 0.18 * slab;
     wall *= 0.84 + 0.16 * smoothstep(0.0, 3.0, fv);
+    // massing detail that survives distance: corner piers, structural bays, belt courses, coping
+    float edgeD = min(fu, faceW - fu);
+    float pier = 1.0 - smoothstep(0.55 - fwU, 0.55 + fwU, edgeD);
+    float bayN = max(1.0, floor(cols / 4.0 + 0.5));
+    float bayF = abs(fract(fu / faceW * bayN + 0.5) - 0.5) * faceW / bayN;
+    float bayPier = (1.0 - smoothstep(0.22 - fwU, 0.22 + fwU, bayF)) * office * (1.0 - smoothstep(0.5, 2.5, fwU));
+    float beltEvery = 6.0 + floor(seed * 0.07);
+    float belt = step(mod(id.y, beltEvery), 0.5) * (1.0 - smoothstep(0.1, 0.16, fc.y)) * inFloors * step(0.5, id.y) * (1.0 - lodY);
+    float coping = smoothstep(bsize.y - 0.45 - fwV, bsize.y - 0.45 + fwV, fv);
+    vec3 trimC = mix(wall * 1.22 + 0.03, wall * 0.62, step(0.5, fract(seed * 0.37)));
+    float mechBand = step(60.0, bsize.y) * bBand(fv, bsize.y - 5.2, bsize.y - 0.9, fwV);
+    float louvre = 0.75 + 0.25 * step(0.5, fract(fv * 2.2)) * (1.0 - smoothstep(0.1, 0.35, fwV));
 
     // masonry: brick courses on punched-window buildings, fading out with distance
     float brickLod = 1.0 - smoothstep(0.012, 0.045, fwV);
@@ -174,6 +190,11 @@ float bGlass = 0.0;
     bEmit *= 1.0 - 0.45 * curtain;
     bEmit *= 1.0 - 0.35 * reveal;
     glassC = mix(glassC, vec3(0.34, 0.31, 0.27), curtain * 0.6);
+    float solid = max(max(pier, bayPier), max(belt, coping));
+    winL *= (1.0 - solid) * (1.0 - mechBand);
+    bEmit *= (1.0 - solid) * (1.0 - mechBand);
+    wall = mix(wall, trimC, max(max(pier, bayPier) * 0.8, max(belt, coping)));
+    wall = mix(wall, vBTint * 0.42 * louvre, mechBand * (1.0 - pier));
     bAlb = mix(wall, glassC * mull * (1.0 - 0.5 * reveal), winL);
     bGlass = winL * (1.0 - blind) * (1.0 - 0.7 * curtain);
     bRough = mix(0.9, 0.12, bGlass);
