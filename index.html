@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Cinematic Weather Simulator</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <div id="app">
+      <main id="stage">
+        <canvas id="scene" aria-label="3D weather simulator view"></canvas>
+        <div id="loading"><span class="loading-dot"></span>Building the city&hellip;</div>
+        <div id="toast" role="status" aria-live="polite"></div>
+        <button id="panel-toggle" type="button" title="Show or hide controls (H)" aria-label="Toggle control panel">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h8M16 17h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><circle cx="16" cy="7" r="2" fill="currentColor"/><circle cx="8" cy="12" r="2" fill="currentColor"/><circle cx="14" cy="17" r="2" fill="currentColor"/></svg>
+        </button>
+      </main>
+      <aside id="panel" aria-label="Simulation controls"></aside>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

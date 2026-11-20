@@ -1,0 +1,15 @@
+# Static hosting for the weather simulator (renderlab.top).
+# Server layout: /opt/renderlab/{docker-compose.yml,nginx.conf,site/,certs/}
+name: renderlab
+services:
+  web:
+    image: nginx:1.27-alpine
+    container_name: renderlab-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
