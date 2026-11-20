@@ -17,4 +17,5 @@ export const ext = {
   uTailOn: { value: 0 },
   uBlink: { value: 0 },
   uFogDensity: { value: 0.001 },
+  uWind: { value: 0.3 },
 };

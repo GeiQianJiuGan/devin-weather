@@ -80,10 +80,11 @@ float bGlass = 0.0;
 {
   vec3 lp = vBPos;
   vec3 bsize = vBSize;
-  float seed = vBMisc.x;
+  // snapped: hashes amplify varying-interpolation error into per-pixel speckle
+  float seed = floor(vBMisc.x * 64.0 + 0.5) / 64.0;
   float litBias = vBMisc.y;
   float shop = vBMisc.z;
-  float kind = vBMisc.w;
+  float kind = floor(vBMisc.w + 0.5);
 
   // facade coordinates in metres (branch-free so derivatives stay valid)
   float isX = step(0.5, abs(vBNrm.x));
@@ -142,11 +143,39 @@ float bGlass = 0.0;
     wall *= 1.0 - 0.18 * slab;
     wall *= 0.84 + 0.16 * smoothstep(0.0, 3.0, fv);
 
+    // masonry: brick courses on punched-window buildings, fading out with distance
+    float brickLod = 1.0 - smoothstep(0.012, 0.045, fwV);
+    float masonry = (1.0 - step(0.5, kind)) * brickLod;
+    float course = fv / 0.085;
+    float brickU = fu / 0.24 + 0.5 * mod(floor(course), 2.0);
+    vec2 bf2 = vec2(fract(brickU), fract(course));
+    float mortar = 1.0 - smoothstep(0.02, 0.07, bf2.x) * smoothstep(0.06, 0.2, bf2.y);
+    float brickTone = bHash(vec2(floor(brickU), floor(course)) + seed);
+    wall = mix(wall, wall * (0.78 + 0.4 * brickTone), masonry * 0.8);
+    wall = mix(wall, wall * 0.55 + vec3(0.1, 0.095, 0.09), mortar * masonry * 0.7);
+    // rain streaks and grime under the window sills and along the parapet
+    float streak = bNoise(vec2(fu * 3.1 + seed, fv * 0.22)) * (1.0 - lod);
+    wall *= 1.0 - 0.16 * streak * smoothstep(0.55, 0.0, fc.y) * inFloors;
+    wall *= 1.0 - 0.22 * smoothstep(bsize.y - 1.4, bsize.y, fv) * (0.5 + 0.5 * streak);
+
+    // window surround: pale frame, sill below, soft shadow of the reveal at the top
+    vec2 fr = vec2(0.055 / cw, 0.07 / fh);
+    vec2 ddO = dd - fr;
+    float surround = (1.0 - smoothstep(-aa.x, aa.x, ddO.x)) * (1.0 - smoothstep(-aa.y, aa.y, ddO.y)) * inFloors * (1.0 - lod);
+    vec3 frameC = mix(vec3(0.62, 0.6, 0.56), vec3(0.09, 0.095, 0.105), step(0.5, kind));
+    wall = mix(wall, frameC * (0.85 + 0.15 * wn), surround);
+    float reveal = smoothstep(0.5 * vBStyle.w - 0.16, 0.5 * vBStyle.w, fc.y - 0.5) * (1.0 - lod);
+
     float blind = step(0.78, r.z) * (1.0 - isLit) * (1.0 - lod);
     vec3 glassC = mix(vec3(0.025, 0.035, 0.05), vec3(0.42, 0.40, 0.36), blind * 0.8);
     glassC = mix(glassC, glassC * (0.6 + 0.8 * vBTint), step(1.5, kind) * 0.5);
-    bAlb = mix(wall, glassC * mull, winL);
-    bGlass = winL * (1.0 - blind);
+    // curtains drawn part-way across some lit windows
+    float curtain = step(0.55, r.x) * (1.0 - office) * (1.0 - lod) * step(abs(fc.x - 0.5), 0.5 * vBStyle.z) * smoothstep(0.5 * vBStyle.z * (0.25 + 0.6 * r.z), 0.5 * vBStyle.z * (0.25 + 0.6 * r.z) + 0.02, abs(fc.x - 0.5));
+    bEmit *= 1.0 - 0.45 * curtain;
+    bEmit *= 1.0 - 0.35 * reveal;
+    glassC = mix(glassC, vec3(0.34, 0.31, 0.27), curtain * 0.6);
+    bAlb = mix(wall, glassC * mull * (1.0 - 0.5 * reveal), winL);
+    bGlass = winL * (1.0 - blind) * (1.0 - 0.7 * curtain);
     bRough = mix(0.9, 0.12, bGlass);
 
     if (shop > 0.5 && fv < groundH) {
@@ -163,15 +192,28 @@ float bGlass = 0.0;
       float nightOn = smoothstep(0.12, 0.5, uCityLights);
       vec3 shopLight = mix(vec3(1.0, 0.82, 0.6), vec3(0.85, 0.93, 1.0), step(0.6, sr.y));
       float shelf = 0.65 + 0.35 * step(0.5, fract(fv * 1.6 + sr.z)) * (0.7 + 0.3 * step(0.4, fract(bu * 6.0 + sr.x)));
-      vec3 eShop = shopLight * (0.5 + 0.6 * sr.z) * shelf * open * (0.18 + 0.82 * nightOn);
+      vec3 eShop = shopLight * (0.2 + 0.28 * sr.z) * shelf * open * (0.18 + 0.82 * nightOn);
       vec3 signCol = bSignColor(sr.y);
       float letters = step(0.35, bHash(vec2(floor(bu * 14.0), bid + seed))) * bBand(fv, 3.42, 3.88, fwV) * bBand(bf, 0.16, 0.84, aaB);
       vec3 eSign = signCol * (0.25 + 1.6 * letters) * nightOn;
       vec3 base = vBTint * 0.5 * (0.9 + 0.2 * wn);
+      // glazing bars, a door leaf and a stall riser under the shop window
+      float bar = max(1.0 - smoothstep(0.006, 0.018, abs(fract(bf * 4.0 + 0.5) - 0.5) / 4.0 * 1.0), 1.0 - smoothstep(0.03, 0.06, abs(fv - 2.45)));
+      bar *= 1.0 - smoothstep(0.4, 1.2, fwU * 12.0);
+      float riser = 1.0 - smoothstep(0.75, 0.82, fv);
+      float isDoor = step(0.38, bf) * step(bf, 0.62);
+      riser *= 1.0 - isDoor;
+      eShop *= (1.0 - 0.85 * bar) * (1.0 - 0.9 * riser);
+      // awning over some bays
+      float awn = step(0.55, sr.z) * bBand(bf, 0.04, 0.96, aaB) * bBand(fv, 2.75, 3.25, fwV);
+      vec3 awnC = mix(signCol * 0.35, vec3(0.75, 0.72, 0.66), step(0.5, fract(bf * 9.0)) * 0.6);
       bAlb = mix(base, vec3(0.03, 0.04, 0.05), glassMask);
+      bAlb = mix(bAlb, vec3(0.05, 0.05, 0.055), bar * glassMask);
+      bAlb = mix(bAlb, base * 0.7, riser * glassMask);
       bAlb = mix(bAlb, mix(signCol * 0.22, vec3(0.8), letters * 0.8), signMask);
-      bEmit = eShop * glassMask + eSign * signMask;
-      bGlass = glassMask;
+      bEmit = eShop * glassMask * (1.0 - awn) + eSign * signMask;
+      bAlb = mix(bAlb, awnC, awn);
+      bGlass = glassMask * (1.0 - riser) * (1.0 - awn);
       bRough = mix(0.85, 0.1, glassMask);
     }
     bAlb *= 1.0 - 0.22 * uWet * (1.0 - bGlass);

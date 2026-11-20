@@ -4,7 +4,6 @@ import {
   Color,
   CylinderGeometry,
   Group,
-  IcosahedronGeometry,
   InstancedMesh,
   Mesh,
   MeshBasicMaterial,
@@ -15,6 +14,7 @@ import {
 } from 'three';
 import { CURB_H, ROAD_HALF } from '../core/layout.js';
 import { DecalBatch } from './Decals.js';
+import { buildTrees } from './Trees.js';
 import { makeRoadSignTexture, makeSignTexture } from './signs.js';
 
 // Streetlights, traffic signals, road signs and street trees.
@@ -200,31 +200,7 @@ export function buildStreetFurniture(rng, realLightCount) {
     [28, -9.2], [44, -9.3], [61, -9.1], [-27, -9.2], [-44, -9.3], [9.2, -31], [9.3, -47], [9.1, -63],
     [-9.2, -33], [-9.3, -52], [27, 9.2], [45, 9.3], [9.2, 30], [9.3, 47], [-9.2, 34], [-30, 9.3], [-48, 9.2],
   ];
-  const trunkGeo = new CylinderGeometry(0.1, 0.16, 3.2, 6);
-  trunkGeo.translate(0, 1.6, 0);
-  const trunks = new InstancedMesh(trunkGeo, new MeshStandardMaterial({ color: 0x2c2118, roughness: 0.9 }), treeSpots.length);
-  const crowns = new InstancedMesh(
-    new IcosahedronGeometry(1, 1),
-    new MeshStandardMaterial({ color: 0x2f4a26, roughness: 0.95, flatShading: true }),
-    treeSpots.length * 3,
-  );
-  treeSpots.forEach(([x, z], i) => {
-    const s = rng.range(0.85, 1.25);
-    place(trunks, i, x, CURB_H, z, rng.range(0, 3), s, s, s);
-    for (let k = 0; k < 3; k++) {
-      const r = rng.range(1.1, 1.7) * s;
-      place(
-        crowns, i * 3 + k,
-        x + rng.range(-0.8, 0.8) * s, CURB_H + (3.4 + k * 0.9 + rng.range(-0.2, 0.2)) * s, z + rng.range(-0.8, 0.8) * s,
-        rng.range(0, 3), r, r * rng.range(0.75, 0.95), r,
-      );
-    }
-  });
-  trunks.castShadow = true;
-  crowns.castShadow = true;
-  trunks.frustumCulled = false;
-  crowns.frustumCulled = false;
-  group.add(trunks, crowns);
+  group.add(buildTrees(rng, treeSpots));
 
   return {
     group,

@@ -166,6 +166,7 @@ export class LightingSystem {
     ext.uWet.value = wx.wet;
     ext.uSnow.value = wx.snowCover;
     ext.uRain.value = wx.rain;
+    ext.uWind.value = clamp(0.12 + weather.wind.speed / 9, 0.12, 2.4);
     this.reflectionActive = wx.wet > 0.03;
 
     const f = this.furniture;

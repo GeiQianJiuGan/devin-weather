@@ -6,7 +6,6 @@ import {
   DoubleSide,
   Group,
   HemisphereLight,
-  IcosahedronGeometry,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -23,6 +22,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { ROOM, ROOM_ORIGIN } from '../core/layout.js';
 import { Rng } from '../core/utils.js';
+import { broadLeafPlant, snakePlant } from './Plants.js';
 import { ScreenContent, contactShadowTexture, keyboardTexture, paperTexture, rugTexture, woodFloorTexture } from './textures.js';
 
 // The bedroom: shell with a corner window, bed, white desk with computer,
@@ -100,8 +100,6 @@ export function buildRoom() {
     dark: mat(0x1a1b1e, 0.55),
     plastic: mat(0x25272b, 0.42),
     metal: mat(0x9b9ea3, 0.35, { metalness: 0.6 }),
-    green: mat(0x3f6e37, 0.85, { flatShading: true }),
-    pot: mat(0xb56c4a, 0.85),
     ceramic: mat(0x2c6a6e, 0.3),
     teal: mat(0x23484d, 0.6),
   };
@@ -199,11 +197,9 @@ export function buildRoom() {
   cyl(0.018, 0.018, 0.48, M.dark, nx, 0.25, nz);
   cyl(0.14, 0.14, 0.015, M.dark, nx, 0.008, nz);
   box(0.15, 0.026, 0.21, M.terracotta, nx + 0.05, 0.526, nz + 0.03).rotation.y = 0.35;
-  cyl(0.05, 0.04, 0.08, M.pot, nx - 0.08, 0.553, nz - 0.05);
-  for (let k = 0; k < 5; k++) {
-    const leaf = add(new Mesh(new IcosahedronGeometry(rng.range(0.035, 0.06), 0), M.green));
-    leaf.position.set(nx - 0.08 + rng.range(-0.05, 0.05), 0.62 + rng.range(0, 0.09), nz - 0.05 + rng.range(-0.05, 0.05));
-  }
+  const bedsidePlant = snakePlant(11);
+  bedsidePlant.position.set(nx - 0.08, 0.513, nz - 0.05);
+  group.add(bedsidePlant);
 
   // --- desk along the east window ------------------------------------------------
   const dx = -0.42;
@@ -268,11 +264,9 @@ export function buildRoom() {
   for (const [ox, oz, color] of [[0.02, 0.012, 0xd04a3a], [-0.018, 0.01, 0x2f6fd0], [0.0, -0.02, 0xe8e8e8]]) {
     stick(new Vector3(-0.14, top + 0.02, 1.2), new Vector3(-0.14 + ox * 2.2, top + 0.17, 1.2 + oz * 2.2), 0.004, mat(color, 0.5));
   }
-  cyl(0.055, 0.042, 0.09, M.pot, -0.18, top + 0.045, 0.98);
-  for (let k = 0; k < 7; k++) {
-    const leaf = add(new Mesh(new IcosahedronGeometry(rng.range(0.04, 0.07), 0), M.green));
-    leaf.position.set(-0.18 + rng.range(-0.06, 0.06), top + 0.12 + rng.range(0, 0.12), 0.98 + rng.range(-0.06, 0.06));
-  }
+  const deskPlant = broadLeafPlant(23);
+  deskPlant.position.set(-0.18, top, 0.98);
+  group.add(deskPlant);
 
   // desk lamp
   const lampBase = new Vector3(-0.2, top + 0.018, 2.36);
