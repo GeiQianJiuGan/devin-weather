@@ -189,8 +189,7 @@ export class App {
     v.moved = false;
     if (v.zoom !== 1) {
       v.zoom = 1;
-      this.sizedFor = null;
-      if (this.quality) this.resize();
+      if (this.quality) this.applyFov();
     }
   }
 
@@ -253,10 +252,11 @@ export class App {
   onWheel(e) {
     e.preventDefault();
     const v = this.view;
-    v.zoom = clamp(v.zoom * Math.exp(e.deltaY * 0.0012), 0.35, 1.5);
+    const zoom = clamp(v.zoom * Math.exp(e.deltaY * 0.0012), 0.35, 1.5);
+    if (zoom === v.zoom) return;
+    v.zoom = zoom;
     v.moved = true;
-    this.sizedFor = null;
-    this.resize();
+    this.applyFov();
   }
 
   onKey(e) {
@@ -299,8 +299,16 @@ export class App {
     this.bufferHeight = bh;
     this.sizedFor = q;
 
+    this.exterior.setSize(bw, bh, q, this.textureType);
+    this.post.setSize(bw, bh, q, this.textureType);
+    this.glass.setInputs(this.exterior.sceneTexture, this.exterior.mistTexture, this.exterior.haloTexture, bw, bh);
+    this.applyFov();
+  }
+
+  /** Camera projection only: zooming must not touch the render targets. */
+  applyFov() {
     // 16:9 is the reference framing; narrower viewports widen the vertical field of view instead of cropping
-    const aspect = width / height;
+    const aspect = Math.max(1, this.stage.clientWidth) / Math.max(1, this.stage.clientHeight);
     const half = (CAMERA.fov * Math.PI) / 360;
     let fov = CAMERA.fov;
     if (aspect < BASE_ASPECT) fov = Math.min(86, (Math.atan((Math.tan(half) * BASE_ASPECT) / aspect) * 360) / Math.PI);
@@ -310,10 +318,7 @@ export class App {
       cam.aspect = aspect;
       cam.updateProjectionMatrix();
     }
-    this.exterior.setSize(bw, bh, q, this.textureType);
-    this.post.setSize(bw, bh, q, this.textureType);
-    this.glass.setInputs(this.exterior.sceneTexture, this.exterior.mistTexture, this.exterior.haloTexture, bw, bh);
-    const pixel = (2 * Math.tan((fov * Math.PI) / 360)) / bh;
+    const pixel = (2 * Math.tan((fov * Math.PI) / 360)) / this.bufferHeight;
     this.rain.setPixelAngle(pixel);
     this.snow.setPixelAngle(pixel);
   }
