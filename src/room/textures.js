@@ -392,3 +392,91 @@ export function sheerCurtainTexture() {
   g.filter = 'none';
   return toTexture(c);
 }
+
+/** Wash of light on a recessed ceiling from a cove along its edges: bright at the rim, gone within a metre. */
+export function coveGlowTexture(w, h) {
+  const N = 256;
+  const [c, g] = canvas(N, N);
+  const img = g.createImageData(N, N);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const x = ((i + 0.5) / N) * w;
+      const y = ((j + 0.5) / N) * h;
+      const glow = (d) => Math.exp(-d / 0.38);
+      const a = Math.min(1, glow(x) + glow(w - x) + glow(y) + glow(h - y));
+      const k = (j * N + i) * 4;
+      img.data[k] = img.data[k + 1] = img.data[k + 2] = Math.round(255 * a);
+      img.data[k + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return toTexture(c);
+}
+
+/** One line of lettering on a flat ground. */
+export function signTexture(text, ground, ink) {
+  const [c, g] = canvas(512, 128);
+  g.fillStyle = ground;
+  g.fillRect(0, 0, 512, 128);
+  g.strokeStyle = ink;
+  g.globalAlpha = 0.5;
+  g.lineWidth = 3;
+  g.strokeRect(10, 10, 492, 108);
+  g.globalAlpha = 1;
+  g.fillStyle = ink;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  let size = 70;
+  do {
+    g.font = `600 ${size}px Georgia, 'Times New Roman', serif`;
+    size -= 4;
+  } while (g.measureText(text).width > 440 && size > 12);
+  g.fillText(text, 256, 68);
+  return toTexture(c);
+}
+
+/** Hand-lettered list: lines in capitals are headings, a trailing number is set to the right. */
+export function chalkboardTexture(lines, ground, ink) {
+  const [c, g] = canvas(768, 512);
+  const rng = new Rng(lines.length * 13 + 5);
+  g.fillStyle = ground;
+  g.fillRect(0, 0, 768, 512);
+  // wiped-over smears
+  g.fillStyle = ink;
+  for (let i = 0; i < 26; i++) {
+    g.globalAlpha = rng.range(0.012, 0.035);
+    g.beginPath();
+    g.ellipse(rng.range(0, 768), rng.range(0, 512), rng.range(60, 220), rng.range(14, 50), rng.range(-0.5, 0.5), 0, Math.PI * 2);
+    g.fill();
+  }
+  const step = (512 - 70) / lines.length;
+  g.textBaseline = 'middle';
+  lines.forEach((line, i) => {
+    const y = 35 + step * (i + 0.5);
+    const heading = line === line.toUpperCase();
+    const price = heading ? null : line.match(/^(.*?)\s{2,}(\S+)$/);
+    g.globalAlpha = heading ? 0.95 : 0.82;
+    g.font = heading
+      ? `600 ${Math.min(step * 0.74, 58)}px Georgia, 'Times New Roman', serif`
+      : `italic ${Math.min(step * 0.66, 46)}px Georgia, 'Times New Roman', serif`;
+    g.save();
+    g.translate(0, y);
+    g.rotate(rng.range(-0.006, 0.006));
+    if (price) {
+      g.textAlign = 'left';
+      g.fillText(price[1], 70, 0);
+      g.textAlign = 'right';
+      g.fillText(price[2], 698, 0);
+    } else {
+      g.textAlign = heading ? 'center' : 'left';
+      g.fillText(line, heading ? 384 : 70, 0);
+      if (heading) {
+        const w = g.measureText(line).width;
+        g.fillRect(384 - w / 2, step * 0.36, w, 2);
+      }
+    }
+    g.restore();
+  });
+  g.globalAlpha = 1;
+  return toTexture(c);
+}

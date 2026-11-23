@@ -191,7 +191,7 @@ export class UIController {
       this.toggle({ label: 'Rain on glass', path: 'scene.windowCondensation' }),
       this.toggle({ label: 'Vehicle traffic', path: 'scene.trafficEnabled' }),
       this.slider({ label: 'Traffic density', path: 'scene.trafficDensity' }),
-      this.toggle({ label: 'Pendant lights', path: 'scene.interiorLightEnabled' }),
+      this.toggle({ label: 'Ceiling lights', path: 'scene.interiorLightEnabled' }),
       this.slider({ label: 'Menu display', path: 'scene.computerScreenBrightness' }),
     );
 

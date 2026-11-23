@@ -481,3 +481,40 @@ input.text:focus-visible {
 .live-status[data-state='error'] {
   color: #ff8a7a;
 }
+
+#github-link {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 12px;
+  text-decoration: none;
+  background: rgba(12, 15, 22, 0.55);
+  backdrop-filter: blur(10px);
+  opacity: 0.7;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+#github-link:hover,
+#github-link:focus-visible {
+  opacity: 1;
+  background: rgba(12, 15, 22, 0.85);
+}
+
+/* the open panel overlays most of a narrow screen: keep the link clear of it as an icon */
+@media (max-width: 860px) {
+  #app:not(.panel-hidden) #github-link {
+    left: 6px;
+    padding: 8px;
+  }
+
+  #app:not(.panel-hidden) #github-link span {
+    display: none;
+  }
+}
