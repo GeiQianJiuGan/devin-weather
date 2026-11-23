@@ -16,6 +16,10 @@
 | ![雨夜](docs/images/rain-night.jpg) 大雨夜晚 | ![大雪](docs/images/snow.jpg) 大雪 |
 | ![雾](docs/images/fog.jpg) 晨雾 | ![深夜](docs/images/midnight.jpg) 打烊后的雪夜 |
 
+![咖啡厅](docs/images/cafe.jpg)
+
+二楼的咖啡厅本身也可以走动和环顾：进门就是带点单区的吧台，跌级吊顶里藏着暖光灯带和射灯。
+
 ## 功能
 
 - **10 种天气**：晴、多云、阴、小雨、中雨、大雨、小雪、大雪、雷暴、雾，每种都可调强度和风力
