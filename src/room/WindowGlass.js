@@ -19,7 +19,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
-const GLINTS = 8;
+const GLINTS = 7;
 
 const FRAG = /* glsl */ `
 #define GLINTS ${GLINTS}
@@ -228,7 +228,7 @@ export class WindowGlass {
       uGlintPos: { value: Array.from({ length: GLINTS }, () => new Vector3()) },
       uGlintColor: { value: Array.from({ length: GLINTS }, () => new Color(0, 0, 0)) },
       // menu display, table lamp, then the pendant shades
-      uGlintSize: { value: [0.2, 0.045, 0.04, 0.04, 0.04, 0.045, 0.045, 0.045] },
+      uGlintSize: { value: [0.2, 0.04, 0.04, 0.04, 0.045, 0.045, 0.045] },
     };
     this.material = new ShaderMaterial({
       vertexShader: VERT,

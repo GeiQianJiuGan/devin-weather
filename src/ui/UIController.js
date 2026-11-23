@@ -192,7 +192,6 @@ export class UIController {
       this.toggle({ label: 'Vehicle traffic', path: 'scene.trafficEnabled' }),
       this.slider({ label: 'Traffic density', path: 'scene.trafficDensity' }),
       this.toggle({ label: 'Pendant lights', path: 'scene.interiorLightEnabled' }),
-      this.toggle({ label: 'Table lamp', path: 'scene.deskLampEnabled' }),
       this.slider({ label: 'Menu display', path: 'scene.computerScreenBrightness' }),
     );
 

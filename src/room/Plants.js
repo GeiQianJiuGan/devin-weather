@@ -11,6 +11,7 @@ import {
   Object3D,
   QuadraticBezierCurve3,
   SRGBColorSpace,
+  SphereGeometry,
   TubeGeometry,
   Vector2,
   Vector3,
@@ -61,31 +62,6 @@ function broadLeafTexture() {
   return t;
 }
 
-function bladeTexture() {
-  const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = '#2b4f2c';
-  g.fillRect(0, 0, 64, 256);
-  const rng = new Rng(47);
-  for (let y = 0; y < 256; y += rng.range(5, 12)) {
-    g.strokeStyle = `rgba(${rng.int(110, 160)},${rng.int(150, 185)},${rng.int(95, 125)},${rng.range(0.3, 0.7)})`;
-    g.lineWidth = rng.range(1.5, 4.5);
-    g.beginPath();
-    g.moveTo(0, y);
-    for (let x = 8; x <= 64; x += 8) g.lineTo(x, y + rng.range(-3, 3));
-    g.stroke();
-  }
-  g.fillStyle = '#b9b65a';
-  g.fillRect(0, 0, 5, 256);
-  g.fillRect(59, 0, 5, 256);
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 16;
-  return t;
-}
-
 /**
  * A leaf blade growing along +Z from the origin, upper side +Y.
  * `outline(u)` gives the half-width fraction at u in [0, 1].
@@ -129,7 +105,6 @@ function leafGeometry({ length, width, fold, droop, twist = 0, outline, nu = 9, 
 }
 
 const OVATE = (u) => Math.sin(Math.PI * u ** 0.62) ** 0.85 * (1 - 0.25 * u) + 0.02;
-const SWORD = (u) => (u < 0.72 ? 0.55 + 0.45 * Math.sin((u / 0.72) * Math.PI * 0.5) : Math.cos(((u - 0.72) / 0.28) * Math.PI * 0.5) ** 0.7) + 0.02;
 
 function potMeshes(r, h, material, soilMat, saucerMat) {
   const rb = r * 0.74;
@@ -157,7 +132,6 @@ let shared;
 function materials() {
   shared ??= {
     broad: new MeshStandardMaterial({ map: broadLeafTexture(), roughness: 0.56, metalness: 0, side: DoubleSide }),
-    blade: new MeshStandardMaterial({ map: bladeTexture(), roughness: 0.5, metalness: 0, side: DoubleSide }),
     stem: new MeshStandardMaterial({ color: 0x55702f, roughness: 0.7 }),
     soil: new MeshStandardMaterial({ color: 0x2a1f17, roughness: 1 }),
     terracotta: new MeshStandardMaterial({ color: 0xa9603f, roughness: 0.88 }),
@@ -211,31 +185,224 @@ export function broadLeafPlant(seed, potR = 0.055, potH = 0.09) {
   return finish(group);
 }
 
-/** An upright snake plant in a glazed ceramic pot. */
-export function snakePlant(seed, potR = 0.05, potH = 0.08) {
+/**
+ * A full, leafy floor plant (ficus like): several canes rising from the pot, each carrying
+ * leaves all the way up, over a skirt of low leaves that hides the soil.
+ */
+export function leafyPlant(seed, potR = 0.05, potH = 0.08) {
   const M = materials();
   const rng = new Rng(seed);
   const group = new Group();
   group.add(...potMeshes(potR, potH, M.ceramic, M.soil, null));
   const soilY = potH * 0.84;
   const leaves = [];
+  const stems = [];
   const dummy = new Object3D();
   dummy.rotation.order = 'YXZ';
-  const N = 11;
-  for (let i = 0; i < N; i++) {
-    const phi = i * 2.39996 + rng.range(-0.3, 0.3);
-    const rad = potR * 0.5 * Math.sqrt(i / N);
-    const length = potR * rng.range(2.2, 4.4) * (1 - 0.3 * (i / N));
+  const addLeaf = (at, phi, pitch, length, droop) => {
     const leaf = leafGeometry({
-      length, width: potR * rng.range(0.24, 0.34), fold: rng.range(0.25, 0.45), droop: rng.range(-0.12, 0.3),
-      twist: rng.range(-0.9, 0.9), outline: SWORD, nu: 10,
+      length, width: length * rng.range(0.3, 0.38), fold: rng.range(0.14, 0.3), droop, outline: OVATE,
     });
-    dummy.position.set(Math.cos(phi) * rad, soilY, Math.sin(phi) * rad);
-    dummy.rotation.set(-Math.PI / 2 + rng.range(0.04, 0.2) + 0.25 * (i / N), Math.PI / 2 - phi, rng.range(-0.5, 0.5));
+    dummy.position.copy(at);
+    dummy.rotation.set(pitch, Math.PI / 2 - phi, rng.range(-0.35, 0.35));
     dummy.updateMatrix();
     leaf.applyMatrix4(dummy.matrix);
     leaves.push(leaf);
+  };
+  const CANES = 11;
+  for (let c = 0; c < CANES; c++) {
+    const phi = c * 2.39996 + rng.range(-0.3, 0.3);
+    // the first cane is the leader, the others lean outwards around it
+    const lean = c === 0 ? 0.15 : rng.range(0.55, 1.25);
+    const height = potR * (c === 0 ? 7.6 : rng.range(4.2, 6.6));
+    const base = new Vector3(Math.cos(phi) * potR * 0.3, soilY, Math.sin(phi) * potR * 0.3);
+    const tip = new Vector3(Math.cos(phi) * potR * lean * 2.2, soilY + height, Math.sin(phi) * potR * lean * 2.2);
+    const ctrl = new Vector3(base.x * 1.3, soilY + height * 0.6, base.z * 1.3);
+    const cane = new QuadraticBezierCurve3(base, ctrl, tip);
+    stems.push(new TubeGeometry(cane, 10, potR * 0.05, 6));
+    const n = Math.round(height / potR / 0.4);
+    for (let i = 0; i < n; i++) {
+      const t = 0.22 + 0.78 * (i / (n - 1));
+      const at = cane.getPoint(t);
+      // leaves spiral around the cane; the top ones stand up, the lower ones hang out
+      const lphi = phi + i * 2.39996 + rng.range(-0.4, 0.4);
+      const length = potR * rng.range(1.1, 1.65) * (1 - 0.3 * t);
+      const out = new Vector3(Math.cos(lphi), 0.35 + 0.5 * t, Math.sin(lphi)).multiplyScalar(potR * 0.3);
+      const from = at.clone().add(out);
+      stems.push(new TubeGeometry(new QuadraticBezierCurve3(at, at.clone().addScaledVector(out, 0.5), from), 3, potR * 0.018, 4));
+      addLeaf(from, lphi, -(0.15 + 0.7 * t) * rng.range(0.8, 1.2), length, rng.range(0.7, 1.4) * (1 - 0.4 * t));
+    }
   }
-  group.add(new Mesh(mergeGeometries(leaves), M.blade));
+  // skirt
+  for (let i = 0; i < 20; i++) {
+    const phi = i * 2.39996 + rng.range(-0.25, 0.25);
+    const at = new Vector3(Math.cos(phi) * potR * 0.75, soilY + potR * rng.range(0.5, 1.1), Math.sin(phi) * potR * 0.75);
+    stems.push(new TubeGeometry(new QuadraticBezierCurve3(new Vector3(at.x * 0.3, soilY, at.z * 0.3), new Vector3(at.x * 0.5, at.y, at.z * 0.5), at), 4, potR * 0.02, 4));
+    addLeaf(at, phi, -rng.range(0.05, 0.35), potR * rng.range(1.5, 2.1), rng.range(1.0, 1.7));
+  }
+  group.add(new Mesh(mergeGeometries(leaves), M.broad), new Mesh(mergeGeometries(stems), M.stem));
+  return finish(group);
+}
+
+const PETAL = (u) => Math.sin(Math.PI * Math.min(1, 0.12 + 0.88 * u) ** 0.8) ** 0.55 * 0.98 + 0.02;
+const ROUND = (u) => Math.sin(Math.PI * u ** 0.8) ** 0.6 + 0.02;
+
+/** Tints a blade by its length: `base` at the stalk end, `tip` at the far end. */
+function shade(geometry, base, tip) {
+  const uv = geometry.getAttribute('uv');
+  const col = new Float32Array(uv.count * 3);
+  for (let i = 0; i < uv.count; i++) {
+    const t = uv.getY(i);
+    for (let k = 0; k < 3; k++) col[i * 3 + k] = base[k] + (tip[k] - base[k]) * t;
+  }
+  geometry.setAttribute('color', new Float32BufferAttribute(col, 3));
+  return geometry;
+}
+
+// linear RGB: [heart of the bloom, petal edge]
+const BLOOMS = [
+  [[0.72, 0.2, 0.2], [0.93, 0.62, 0.58]], // blush rose
+  [[0.8, 0.55, 0.3], [0.96, 0.9, 0.8]], // cream
+  [[0.6, 0.1, 0.08], [0.9, 0.32, 0.2]], // coral
+  [[0.3, 0.03, 0.08], [0.55, 0.08, 0.16]], // burgundy
+  [[0.75, 0.42, 0.1], [0.97, 0.75, 0.35]], // apricot
+  [[0.5, 0.3, 0.55], [0.8, 0.7, 0.88]], // lilac
+];
+
+let flowerMats;
+function flowerMaterials() {
+  flowerMats ??= {
+    petal: new MeshStandardMaterial({ vertexColors: true, roughness: 0.62, side: DoubleSide }),
+    green: new MeshStandardMaterial({ vertexColors: true, roughness: 0.7, side: DoubleSide }),
+    stem: new MeshStandardMaterial({ color: 0x4d6a34, roughness: 0.7 }),
+    tiny: new MeshStandardMaterial({ color: 0xf3efe4, roughness: 0.8 }),
+    vases: [
+      new MeshStandardMaterial({ color: 0xf1ede4, roughness: 0.3 }),
+      new MeshStandardMaterial({ color: 0x8c9a94, roughness: 0.5 }),
+      new MeshStandardMaterial({ color: 0x33475a, roughness: 0.35 }),
+    ],
+  };
+  return flowerMats;
+}
+
+/**
+ * A hand-tied bunch in a ceramic vase: garden roses in mixed colours, tulip-like buds,
+ * sprays of tiny white flowers and eucalyptus. `size` is the vase height in metres.
+ */
+export function flowerArrangement(seed, size = 0.15, blooms = 7) {
+  const F = flowerMaterials();
+  const rng = new Rng(seed);
+  const group = new Group();
+  const s = size;
+  const vase = [
+    [0, 0], [0.2, 0], [0.3, 0.06], [0.36, 0.3], [0.33, 0.6], [0.2, 0.84], [0.19, 0.94], [0.23, 1], [0.2, 1], [0.165, 0.93], [0.17, 0.84], [0, 0.8],
+  ].map(([r, h]) => new Vector2(r * s, h * s));
+  group.add(new Mesh(new LatheGeometry(vase, 36), F.vases[seed % F.vases.length]));
+
+  const petals = [];
+  const greens = [];
+  const stems = [];
+  const tiny = [];
+  const dummy = new Object3D();
+  dummy.rotation.order = 'YXZ';
+  const head = new Object3D();
+  const up = new Vector3(0, 1, 0);
+  const mouth = new Vector3(0, s * 0.92, 0);
+  const place = (geometry, into) => {
+    dummy.updateMatrix();
+    geometry.applyMatrix4(dummy.matrix);
+    geometry.applyMatrix4(head.matrix);
+    into.push(geometry);
+  };
+  const stemTo = (tip, radius) => {
+    const ctrl = new Vector3(tip.x * 0.25, mouth.y + (tip.y - mouth.y) * 0.6, tip.z * 0.25);
+    stems.push(new TubeGeometry(new QuadraticBezierCurve3(mouth, ctrl, tip), 8, radius, 5));
+    return tip.clone().sub(ctrl).normalize();
+  };
+  const aim = (tip, dir) => {
+    head.position.copy(tip);
+    head.quaternion.setFromUnitVectors(up, dir);
+    head.updateMatrix();
+  };
+  // a leaf or petal growing out of the head's axis at azimuth `phi`, raised by `lift` radians
+  const blade = (opts, phi, lift, at, colours, into) => {
+    dummy.position.set(Math.cos(phi) * at[0], at[1], Math.sin(phi) * at[0]);
+    dummy.rotation.set(-lift, Math.PI / 2 - phi, 0);
+    place(shade(leafGeometry({ nu: 6, nv: 2, ...opts }), colours[0], colours[1]), into);
+  };
+
+  for (let i = 0; i < blooms; i++) {
+    // the first bloom stands in the middle, the rest fan out in a dome around it
+    const f = i === 0 ? 0 : 0.35 + 0.65 * (i / (blooms - 1));
+    const phi = i * 2.39996 + rng.range(-0.3, 0.3);
+    const reach = s * (0.15 + 1.05 * f) * rng.range(0.85, 1.1);
+    const tip = new Vector3(Math.cos(phi) * reach, s * (2.25 - 0.75 * f * f) * rng.range(0.92, 1.06), Math.sin(phi) * reach);
+    aim(tip, stemTo(tip, s * 0.016).lerp(up, 0.35).normalize());
+    const colours = BLOOMS[(seed + i * 5 + rng.int(0, 1)) % BLOOMS.length];
+    const R = s * rng.range(0.34, 0.44);
+    if (i % 4 === 3) {
+      // a closed bud: two rings of petals wrapped tight
+      for (let k = 0; k < 7; k++) {
+        blade({ length: R * 1.25, width: R * 0.42, fold: 0.5, droop: -0.5, outline: PETAL }, k * 2.4, 1.2 - 0.06 * k, [R * 0.12, 0], colours, petals);
+      }
+    } else {
+      // an open rose: tight heart, then rings that open wider and curl back
+      const rings = [[5, 0.5, 1.35, -0.3], [6, 0.68, 1.1, 0.1], [7, 0.86, 0.8, 0.5], [8, 1, 0.45, 0.9]];
+      rings.forEach(([n, len, lift, droop], r) => {
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * Math.PI * 2 + r * 0.7 + rng.range(-0.15, 0.15);
+          blade(
+            { length: R * len, width: R * len * 0.52, fold: 0.32, droop, outline: PETAL },
+            a, lift * rng.range(0.9, 1.1), [R * 0.05 * r, -R * 0.03 * r], colours, petals,
+          );
+        }
+      });
+    }
+    // sepals under the bloom
+    for (let k = 0; k < 5; k++) {
+      blade({ length: R * 0.5, width: R * 0.12, fold: 0.2, droop: 0.6, outline: ROUND }, k * 1.257, 0.15, [R * 0.05, -R * 0.08], [[0.07, 0.16, 0.05], [0.12, 0.26, 0.08]], greens);
+    }
+  }
+
+  // eucalyptus: long stems with pairs of round grey-green leaves
+  const EUC = [[0.16, 0.25, 0.2], [0.36, 0.47, 0.4]];
+  for (let i = 0; i < 6; i++) {
+    const phi = i * 1.047 + rng.range(-0.3, 0.3) + 0.5;
+    const reach = s * rng.range(1.0, 1.55);
+    const tip = new Vector3(Math.cos(phi) * reach, s * rng.range(1.5, 2.7), Math.sin(phi) * reach);
+    const ctrl = new Vector3(tip.x * 0.25, mouth.y + (tip.y - mouth.y) * 0.6, tip.z * 0.25);
+    const curve = new QuadraticBezierCurve3(mouth, ctrl, tip);
+    stems.push(new TubeGeometry(curve, 8, s * 0.011, 5));
+    for (let j = 0; j < 9; j++) {
+      const t = 0.3 + 0.7 * (j / 8);
+      aim(curve.getPoint(t), curve.getTangent(t));
+      const L = s * 0.3 * (1 - 0.45 * t);
+      for (const side of [0, Math.PI]) {
+        blade({ length: L, width: L * 0.48, fold: 0.12, droop: 0.4, outline: ROUND }, j * 1.57 + side, 0.5, [0, 0], EUC, greens);
+      }
+    }
+  }
+
+  // sprays of tiny white flowers between the blooms
+  for (let i = 0; i < 5; i++) {
+    const phi = i * 1.257 + rng.range(-0.3, 0.3) + 0.2;
+    const reach = s * rng.range(0.5, 1.2);
+    const tip = new Vector3(Math.cos(phi) * reach, s * rng.range(2.1, 2.6), Math.sin(phi) * reach);
+    stemTo(tip, s * 0.007);
+    for (let j = 0; j < 9; j++) {
+      const at = tip.clone().add(new Vector3(rng.range(-1, 1), rng.range(-0.7, 0.9), rng.range(-1, 1)).multiplyScalar(s * 0.2));
+      stems.push(new TubeGeometry(new QuadraticBezierCurve3(tip.clone().lerp(mouth, 0.25), tip, at), 3, s * 0.004, 4));
+      const dot = new SphereGeometry(s * 0.035, 6, 5);
+      dot.translate(at.x, at.y, at.z);
+      tiny.push(dot);
+    }
+  }
+
+  group.add(
+    new Mesh(mergeGeometries(petals), F.petal),
+    new Mesh(mergeGeometries(greens), F.green),
+    new Mesh(mergeGeometries(stems), F.stem),
+    new Mesh(mergeGeometries(tiny), F.tiny),
+  );
   return finish(group);
 }

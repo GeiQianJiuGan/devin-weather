@@ -307,3 +307,88 @@ export class ScreenContent {
     g.fillText('Oat and soy milk available  ·  Please order at the counter', 48, 512);
   }
 }
+
+/** A framed print: overlapping paper-cut shapes in muted colours on off-white stock. */
+export function artPrintTexture(seed) {
+  const W = 384;
+  const H = 512;
+  const [c, g] = canvas(W, H);
+  const rng = new Rng(seed);
+  g.fillStyle = '#ece6d8';
+  g.fillRect(0, 0, W, H);
+  const inks = ['#b5573a', '#2f4a3c', '#d9a441', '#1f2f45', '#c98f7a', '#8ea183', '#3a2a22'];
+  const m = 44;
+  g.save();
+  g.beginPath();
+  g.rect(m, m, W - 2 * m, H - 2 * m);
+  g.clip();
+  g.fillStyle = rng.pick(['#e2d6bf', '#d8ddd2', '#ead9cc']);
+  g.fillRect(m, m, W - 2 * m, H - 2 * m);
+  for (let i = 0; i < 6; i++) {
+    g.fillStyle = rng.pick(inks);
+    g.globalAlpha = rng.range(0.82, 1);
+    const x = rng.range(m, W - m);
+    const y = rng.range(m, H - m);
+    const r = rng.range(40, 130);
+    g.beginPath();
+    const kind = rng.int(0, 3);
+    if (kind === 0) g.arc(x, y, r, 0, Math.PI * 2);
+    else if (kind === 1) g.arc(x, y, r, rng.range(0, 6.3), rng.range(0, 6.3) + Math.PI);
+    else if (kind === 2) g.ellipse(x, y, r * 0.45, r * 1.2, rng.range(-0.6, 0.6), 0, Math.PI * 2);
+    else g.rect(x - r * 0.4, y - r, r * 0.8, r * 2);
+    g.fill();
+  }
+  g.globalAlpha = 1;
+  g.strokeStyle = '#2a2420';
+  g.lineWidth = 2.5;
+  for (let i = 0; i < 2; i++) {
+    g.beginPath();
+    g.moveTo(rng.range(m, W - m), H - m);
+    g.bezierCurveTo(rng.range(m, W - m), H * 0.6, rng.range(m, W - m), H * 0.5, rng.range(m, W - m), rng.range(m, H * 0.4));
+    g.stroke();
+  }
+  g.restore();
+  // paper grain
+  for (let i = 0; i < 2600; i++) {
+    g.fillStyle = `rgba(${rng.next() > 0.5 ? 255 : 0}, ${rng.next() > 0.5 ? 255 : 0}, 0, 0.025)`;
+    g.fillRect(rng.range(0, W), rng.range(0, H), 2, 2);
+  }
+  return toTexture(c);
+}
+
+/** Reeded (fluted) privacy glass: one tile is 12 vertical ribs. */
+export function reededGlassTexture() {
+  const [c, g] = canvas(384, 16);
+  for (let k = 0; k < 12; k++) {
+    const grad = g.createLinearGradient(k * 32, 0, (k + 1) * 32, 0);
+    grad.addColorStop(0, '#6f7b78');
+    grad.addColorStop(0.3, '#c9d3cf');
+    grad.addColorStop(0.55, '#eef3f0');
+    grad.addColorStop(0.85, '#a3afab');
+    grad.addColorStop(1, '#6f7b78');
+    g.fillStyle = grad;
+    g.fillRect(k * 32, 0, 32, 16);
+  }
+  return toTexture(c, true);
+}
+
+/** Light through a drawn sheer: bright panes, the shadow of the sash bars, a darker hem. */
+export function sheerCurtainTexture() {
+  const [c, g] = canvas(256, 256);
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#6a6a6a');
+  grad.addColorStop(0.12, '#ffffff');
+  grad.addColorStop(0.86, '#e8e8e8');
+  grad.addColorStop(1, '#5a5a5a');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  g.filter = 'blur(5px)';
+  g.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  g.fillRect(0, 0, 34, 256);
+  g.fillRect(222, 0, 34, 256);
+  g.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  g.fillRect(123, 20, 10, 216);
+  g.fillRect(34, 116, 188, 9);
+  g.filter = 'none';
+  return toTexture(c);
+}

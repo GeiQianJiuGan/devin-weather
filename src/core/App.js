@@ -450,7 +450,6 @@ export class App {
     this.lightsOn = on;
     const store = this.store;
     store.set('scene.interiorLightEnabled', on);
-    store.set('scene.deskLampEnabled', on);
     store.set('scene.computerScreenBrightness', on ? 80 : 0);
   }
 
