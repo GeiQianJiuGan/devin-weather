@@ -252,7 +252,9 @@ export class App {
   onWheel(e) {
     e.preventDefault();
     const v = this.view;
-    const zoom = clamp(v.zoom * Math.exp(e.deltaY * 0.0012), 0.35, 1.5);
+    // wheels report pixels, lines or pages depending on the device
+    const delta = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    const zoom = clamp(v.zoom * Math.exp(delta * 0.0012), 0.35, 1.5);
     if (zoom === v.zoom) return;
     v.zoom = zoom;
     v.moved = true;
