@@ -636,7 +636,10 @@ export function buildRoom() {
     b.position.set(x, y + 0.075, z);
     group.add(b);
   };
-  for (const z of [3.0, 3.75, 4.5]) pendantDome((cx0 + cx1) / 2, 2.12, z);
+  const domeAnchors = [3.0, 3.75, 4.5].map((z) => {
+    pendantDome((cx0 + cx1) / 2, 2.12, z);
+    return new Vector3((cx0 + cx1) / 2, 2.14, z).add(ROOM_ORIGIN);
+  });
   // Over the window tables: enamelled spun-metal shades on a twisted cord, each with a brass
   // lamp holder, a vented neck and a frosted bulb that sits just above the rim.
   const pendantShadeProfile = [
@@ -651,7 +654,9 @@ export function buildRoom() {
   });
   const pendantBulbProfile = [[0, -0.048], [0.014, -0.045], [0.024, -0.036], [0.03, -0.02], [0.03, -0.006], [0.024, 0.014], [0.015, 0.03], [0.013, 0.05]];
   const pendantBulbGeo = new LatheGeometry(pendantBulbProfile.map(([r, h]) => new Vector2(r, h)), 24);
+  const pendantAnchors = [];
   const pendantShade = (x, y, z, sway) => {
+    pendantAnchors.push(new Vector3(x, y + 0.02, z).add(ROOM_ORIGIN));
     const g = new Group();
     g.position.set(x, y, z);
     g.rotation.set(sway * 0.02, sway, -sway * 0.015);
@@ -773,6 +778,7 @@ export function buildRoom() {
     shadeInnerMaterial: pendantShadeInner,
     anchors: {
       screen: screenCenter,
+      pendants: [...pendantAnchors, ...domeAnchors],
       lamp: bulb.getWorldPosition(new Vector3()),
       centre: new Vector3(-W / 2, 1.2, D / 2).add(ROOM_ORIGIN),
     },

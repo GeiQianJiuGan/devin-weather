@@ -19,7 +19,10 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
+const GLINTS = 8;
+
 const FRAG = /* glsl */ `
+#define GLINTS ${GLINTS}
 uniform sampler2D tScene;
 uniform sampler2D tMist;
 uniform sampler2D tHalo;
@@ -33,9 +36,9 @@ uniform float uMistOn;
 uniform float uTilt;
 uniform vec3 uVeil;
 uniform vec3 uInterior;
-uniform vec3 uGlintPos[2];
-uniform vec3 uGlintColor[2];
-uniform float uGlintSize[2];
+uniform vec3 uGlintPos[GLINTS];
+uniform vec3 uGlintColor[GLINTS];
+uniform float uGlintSize[GLINTS];
 varying vec2 vGuv;
 varying vec3 vWorldPos;
 varying vec3 vWorldNormal;
@@ -188,11 +191,20 @@ void main() {
   float fres = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
   col = mix(col, uInterior, min(fres, 0.6));
   vec3 R = reflect(-V, N);
-  for (int i = 0; i < 2; i++) {
+  // Mirror images of the room's lamps. Each is a small, fairly crisp spot the size of the
+  // bulb with a faint skirt, plus a weaker second image from the back face of the pane -
+  // not a big soft blob.
+  vec3 R2 = normalize(R + N * 0.012);
+  for (int i = 0; i < GLINTS; i++) {
     vec3 toL = uGlintPos[i] - vWorldPos;
-    float t = max(dot(toL, R), 0.0);
-    vec3 miss = toL - R * t;
-    col += uGlintColor[i] * exp(-dot(miss, miss) / (uGlintSize[i] * uGlintSize[i])) * fres;
+    float s2 = uGlintSize[i] * uGlintSize[i];
+    vec3 miss = toL - R * max(dot(toL, R), 0.0);
+    float q = dot(miss, miss) / s2;
+    float img = exp(-q * q) + 0.06 * exp(-q * 0.06);
+    vec3 miss2 = toL - R2 * max(dot(toL, R2), 0.0);
+    float q2 = dot(miss2, miss2) / s2;
+    img += 0.35 * exp(-q2 * q2);
+    col += uGlintColor[i] * img * min(fres, 0.5);
   }
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -213,9 +225,10 @@ export class WindowGlass {
       uTilt: { value: 0 },
       uVeil: { value: new Color(0.5, 0.55, 0.6) },
       uInterior: { value: new Color(0.02, 0.02, 0.02) },
-      uGlintPos: { value: [new Vector3(), new Vector3()] },
-      uGlintColor: { value: [new Color(0, 0, 0), new Color(0, 0, 0)] },
-      uGlintSize: { value: [0.22, 0.07] },
+      uGlintPos: { value: Array.from({ length: GLINTS }, () => new Vector3()) },
+      uGlintColor: { value: Array.from({ length: GLINTS }, () => new Color(0, 0, 0)) },
+      // menu display, table lamp, then the pendant shades
+      uGlintSize: { value: [0.2, 0.045, 0.04, 0.04, 0.04, 0.045, 0.045, 0.045] },
     };
     this.material = new ShaderMaterial({
       vertexShader: VERT,

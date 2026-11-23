@@ -97,6 +97,12 @@ export class LightingSystem {
     const cityLights = 1 - smoothstep(0.2, 0.8, lum);
     this.cityLights = cityLights;
     const lampsOn = smoothstep(0.2, 0.6, cityLights);
+    // After midnight the town sleeps: the cafe is shut and dark, shops, signs and nearly all
+    // windows are off. Only the streetlights and the traffic keep burning until dawn.
+    const hour = env.hour;
+    const late = hour < 12 ? 1 - smoothstep(5.2, 6.2, hour) : smoothstep(23.0, 23.9, hour);
+    this.late = late;
+    ext.uLate.value = late;
     const precip = smoothstep(0.08, 0.4, wx.rain + wx.snow + wx.fog * 40);
     const headOn = Math.max(0.1, cityLights, 0.75 * precip);
     const tailOn = Math.max(cityLights, 0.6 * precip);
@@ -117,7 +123,7 @@ export class LightingSystem {
     su.uFlash.value = flash;
     su.uFlashDir.value.copy(lightning.direction);
 
-    const cityGlow = _c.copy(CITY_GLOW).multiplyScalar(env.night * (0.6 + 0.8 * cover));
+    const cityGlow = _c.copy(CITY_GLOW).multiplyScalar(env.night * (0.6 + 0.8 * cover) * (1 - 0.6 * late));
     su.uCityGlow.value.copy(cityGlow);
 
     // ambient sky colour (what clouds, fog, glass and wet surfaces pick up)
@@ -151,10 +157,10 @@ export class LightingSystem {
     this.sun.position.copy(this.sun.target.position).addScaledVector(lightDir, 300);
     this.hemi.color.copy(ambient).multiplyScalar(1 / Math.max(env.hemiIntensity * wx.skyMul, 1e-3));
     this.hemi.groundColor.copy(env.hemiGround);
-    this.hemi.intensity = env.hemiIntensity * wx.skyMul + 0.12 * env.night + flash * 0.9;
+    this.hemi.intensity = env.hemiIntensity * wx.skyMul + 0.12 * env.night * (1 - 0.45 * late) + flash * 0.9;
 
     // --- city ---------------------------------------------------------------------------
-    ext.uCityLights.value = 0.07 + 0.93 * cityLights;
+    ext.uCityLights.value = (0.07 + 0.93 * cityLights) * lerp(1, 0.11, late);
     ext.uWindowGain.value = lerp(0.5, 1.25, cityLights);
     mad(ext.uSkyRefl.value.copy(env.horizon).multiplyScalar(0.6), env.zenith, 0.4).multiplyScalar(wx.skyMul);
     ext.uSkyRefl.value.lerp(su.uCloudLit.value, 0.7 * cover);
@@ -172,7 +178,8 @@ export class LightingSystem {
     const f = this.furniture;
     f.bulbMaterial.color.copy(STREETLIGHT_COLOR).multiplyScalar(0.02 + 26 * lampsOn);
     for (const light of f.lights) light.intensity = 120 * lampsOn;
-    if (this.first || Math.abs(lampsOn - this.lastLamps) > 0.002 || Math.abs(wx.wet - this.lastWet) > 0.01) {
+    if (this.first || Math.abs(lampsOn - this.lastLamps) > 0.002 || Math.abs(wx.wet - this.lastWet) > 0.01 || Math.abs(late - this.lastLate) > 0.002) {
+      this.lastLate = late;
       const road = lampsOn * 0.5 * (1 - 0.35 * wx.wet);
       for (let i = 0; i < f.lamps.length; i++) {
         const real = i < f.lights.length && f.lights[i].visible;
@@ -180,13 +187,13 @@ export class LightingSystem {
         f.pools.setIntensity(i * 2 + 1, real ? 0 : lampsOn * 0.8);
       }
       f.pools.commit();
-      const spillOn = smoothstep(0.1, 0.5, cityLights) * 0.5;
+      const spillOn = smoothstep(0.1, 0.5, cityLights) * 0.5 * (1 - late);
       for (const s of this.city.spill) this.city.shopSpill.setIntensity(s.index, s.power * spillOn);
       this.city.shopSpill.commit();
       this.lastLamps = lampsOn;
       this.lastWet = wx.wet;
     }
-    const signNight = smoothstep(0.08, 0.5, cityLights);
+    const signNight = smoothstep(0.08, 0.5, cityLights) * (1 - 0.94 * late);
     for (const sign of this.city.signs) sign.mesh.material.color.setScalar(Math.max(lum * 0.85, sign.night * signNight));
 
     this.traffic.lampGain = lerp(3.2, 6.5, cityLights);
@@ -205,9 +212,10 @@ export class LightingSystem {
     const scene = state.scene;
     const lv = this.levels;
     const k = this.first ? 1000 : 6;
-    lv.interior = damp(lv.interior, scene.interiorLightEnabled ? 1 : 0, k, realDt);
-    lv.lamp = damp(lv.lamp, scene.deskLampEnabled ? 1 : 0, k, realDt);
-    lv.screen = damp(lv.screen, scene.computerScreenBrightness / 100, k, realDt);
+    const open = 1 - late;
+    lv.interior = damp(lv.interior, scene.interiorLightEnabled ? open : 0, k, realDt);
+    lv.lamp = damp(lv.lamp, scene.deskLampEnabled ? open : 0, k, realDt);
+    lv.screen = damp(lv.screen, (scene.computerScreenBrightness / 100) * open, k, realDt);
     const L = this.room.lights;
 
     L.sun.color.copy(this.sun.color);
@@ -233,7 +241,7 @@ export class LightingSystem {
     L.windowEastPoint.intensity = L.windowAreaEast * 2.2;
 
     L.fill.color.copy(WARM).lerp(_d.copy(ambient).multiplyScalar(1 / Math.max(luminance(ambient), 1e-3)), 0.5 * clamp(lum, 0, 1));
-    L.fill.intensity = 0.03 + 0.22 * clamp(lum, 0, 1) + 0.1 * lv.interior + 0.03 * lv.lamp + flash * 0.12;
+    L.fill.intensity = lerp(0.03, 0.008, late) + 0.22 * clamp(lum, 0, 1) + 0.1 * lv.interior + 0.03 * lv.lamp + flash * 0.12;
     L.ceiling.intensity = 2.4 * lv.interior;
     L.pendants.intensity = 2.0 * lv.interior;
     this.room.fixtureMaterial.color.copy(WARM).multiplyScalar(0.04 + 9 * lv.interior);
@@ -270,11 +278,18 @@ export class LightingSystem {
     gu.uGlintPos.value[0].copy(this.room.anchors.screen);
     gu.uGlintPos.value[1].copy(this.room.anchors.lamp);
     gu.uGlintColor.value[0].copy(SCREEN_COOL).multiplyScalar(2.2 * screenPower);
-    gu.uGlintColor.value[1].copy(LAMP_WARM).multiplyScalar(16 * lv.lamp);
+    gu.uGlintColor.value[0].multiplyScalar(0.5);
+    gu.uGlintColor.value[1].copy(LAMP_WARM).multiplyScalar(8 * lv.lamp * (0.08 + 0.92 * cityLights));
+    const pendantAnchors = this.room.anchors.pendants;
+    for (let i = 0; i < pendantAnchors.length; i++) {
+      gu.uGlintPos.value[2 + i].copy(pendantAnchors[i]);
+      // against daylight a reflection on the glass is all but invisible
+      gu.uGlintColor.value[2 + i].copy(WARM).multiplyScalar(6 * lv.interior * (0.08 + 0.92 * cityLights));
+    }
 
     this.scatter = lerp(0.4, 0.68, clamp(g.mist + g.blur, 0, 1));
     this.haloThreshold = lerp(1.0, 2.4, clamp(lum, 0, 1));
-    this.exposure = env.exposure * (1 + 0.2 * overcast * env.day);
+    this.exposure = env.exposure * (1 + 0.2 * overcast * env.day) * lerp(1, 0.5, late);
     this.first = false;
   }
 

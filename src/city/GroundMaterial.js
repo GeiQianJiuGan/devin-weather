@@ -100,6 +100,7 @@ float gFine = gNoise(gp * 9.0);
 float gGrain = 1.0 - smoothstep(0.03, 0.2, gCoarse);
 float gPaint = 0.0;
 float gTrack = 0.0;
+float gRut = 0.0;
 
 #ifdef GROUND_ROAD
   vec3 gAlb = vec3(0.092, 0.094, 0.098) * (0.75 + 0.5 * gLarge) * (1.0 + (gFine - 0.5) * 0.35 * gGrain);
@@ -121,8 +122,26 @@ float gTrack = 0.0;
   if (laneLat >= 0.0) {
     float inLane = mod(laneLat, LANE) - LANE * 0.5;
     gTrack = gLine(abs(inLane) - 0.85, 0.3, 0.14);
+    // In snow the wheel paths are not ruled lines: every car takes a slightly different
+    // line, so the ruts wander, change width, overlap and are half filled in again.
+    float gAlong = gaz < RW + 0.5 && gax > RW ? gp.x : gp.y;
+    float laneId = floor(laneLat / LANE) + 2.0 * step(0.0, gp.x + gp.y);
+    float wob = (gNoise(vec2(gAlong * 0.11, laneId * 7.3)) - 0.5) * 1.1 + (gNoise(vec2(gAlong * 0.37, laneId * 3.1 + 5.0)) - 0.5) * 0.4;
+    // ragged edges
+    wob += (gNoise(gp * 1.9 + 41.0) - 0.5) * 0.3;
+    float wide = 0.2 + 0.2 * gNoise(vec2(gAlong * 0.21 + 13.0, laneId * 5.7));
+    float rutA = gLine(abs(inLane - wob) - 0.82, wide, 0.22);
+    float rutB = gLine(abs(inLane + wob * 0.6 - 0.1) - 0.74, wide * 0.7, 0.2) * 0.6;
+    float churn = gFbm(gp * vec2(1.7, 1.7) + 17.0);
+    float fine = gNoise(gp * 6.5 + 3.0);
+    // long stretches where fresh snow has covered the tracks again
+    float worn = smoothstep(0.3, 0.75, gNoise(vec2(gAlong * 0.045 + 9.0, laneId * 11.0)) + 0.35 * (gLarge - 0.5));
+    gRut = max(rutA, rutB) * smoothstep(0.18, 0.62, churn + 0.25 * fine) * (0.25 + 0.75 * worn) * (1.0 - 0.45 * uSnow);
+    gRut = max(gRut, 0.22 * smoothstep(0.55, 0.8, churn) * gLine(inLane, 1.3, 0.4));
   } else {
     gTrack = 0.6;
+    // the junction is churned by turning traffic
+    gRut = 0.2 + 0.6 * smoothstep(0.3, 0.7, gFbm(gp * 1.3 + 17.0));
   }
   gAlb *= 1.0 - 0.1 * gTrack;
 #else
@@ -155,8 +174,11 @@ gRough *= 1.0 - 0.2 * gPaint;
 // snow cover (tyres keep dark tracks on the road)
 float snTh = 1.0 - uSnow * 1.25;
 float snow = smoothstep(snTh, snTh + 0.35, gFbm(gp * 0.4 + 31.0)) * step(0.001, uSnow);
-snow *= 1.0 - 0.82 * gTrack;
+// ruts hold grey-brown slush rather than clean asphalt; packed snow stays between the tyres
+float slush = gRut * snow;
+snow *= 1.0 - 0.8 * gRut;
 gAlb = mix(gAlb, vec3(0.80, 0.84, 0.90), snow);
+gAlb = mix(gAlb, vec3(0.33, 0.32, 0.31) * (0.8 + 0.4 * gNoise(gp * 4.0)), slush * 0.55);
 gRough = mix(gRough, 0.82, snow);
 diffuseColor.rgb = gAlb;
 `;

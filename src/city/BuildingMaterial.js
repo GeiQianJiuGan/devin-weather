@@ -32,6 +32,7 @@ vBMisc = aMisc;
 
 const FRAG_PARS = /* glsl */ `
 uniform float uCityLights;
+uniform float uLate;
 uniform float uWindowGain;
 uniform vec3 uSkyRefl;
 uniform float uWet;
@@ -305,7 +306,7 @@ float bGlass = 0.0;
       // window decal: roundel logo on some windows
       float decal = bBand(length(vec2(bx - bw * 0.3, fv - 1.55)), 0.2, 0.235, fwU) * step(0.6, sr2.x) * winG * det;
       vec3 shopLight = mix(vec3(1.0, 0.8, 0.58), vec3(0.9, 0.95, 1.0), step(0.72, sr.z));
-      vec3 eShop = inter * shopLight * (0.26 + 0.16 * sr.z) * (0.16 + 0.84 * nightOn);
+      vec3 eShop = inter * shopLight * (0.26 + 0.16 * sr.z) * (0.16 + 0.84 * nightOn) * (1.0 - 0.94 * uLate);
 
       // roller shutter on closed shops
       float slat = 0.75 + 0.25 * step(0.5, fract(fv / 0.09));
@@ -379,6 +380,7 @@ export function createBuildingMaterial() {
   const material = new MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCityLights = ext.uCityLights;
+    shader.uniforms.uLate = ext.uLate;
     shader.uniforms.uWindowGain = ext.uWindowGain;
     shader.uniforms.uSkyRefl = ext.uSkyRefl;
     shader.uniforms.uWet = ext.uWet;
