@@ -249,9 +249,10 @@ float bFlatRefl = 1.0;
     float depth = mix(mix(3.0, 5.0, r.y), 7.5, office);
     vec3 bmin = vec3(-0.5 * cw, -0.5 * fh, 0.0);
     vec3 bmax = vec3(0.5 * cw, 0.5 * fh - 0.28, depth);
-    vec3 ro = vec3(wp, 0.0);
+    // start inside the room even where the opening reaches above the ceiling or on solid wall
+    vec3 ro = vec3(wp.x, min(wp.y, bmax.y - 0.02), 0.0);
     vec3 tt = (mix(bmin, bmax, step(0.0, vf)) - ro) / vf;
-    vec3 hp = ro + vf * min(tt.x, min(tt.y, tt.z));
+    vec3 hp = ro + vf * max(min(tt.x, min(tt.y, tt.z)), 0.0);
     float isBack = step(tt.z, min(tt.x, tt.y));
     float isSide = (1.0 - isBack) * step(tt.x, tt.y);
     float isCeil = (1.0 - isBack) * (1.0 - isSide) * step(0.0, vf.y);
