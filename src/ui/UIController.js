@@ -118,7 +118,7 @@ export class UIController {
     const results = el('div', { class: 'chips cities' }, ...cityChips(CITIES));
     this.updaters.push(() => {
       const l = store.get('live');
-      for (const chip of results.children) chip.setAttribute('aria-pressed', String(l.enabled && chip.dataset.pos === `${l.lat},${l.lon}`));
+      for (const chip of results.children) chip.setAttribute('aria-pressed', String(l.enabled && !l.auto && chip.dataset.pos === `${l.lat},${l.lon}`));
     });
     const cityInput = el('input', { type: 'text', class: 'text', placeholder: 'City, e.g. 成都', 'aria-label': 'City name', maxlength: '40' });
     const search = async () => {
@@ -146,6 +146,7 @@ export class UIController {
     };
     const live = this.section('Live weather',
       this.toggle({ label: 'Follow real weather and local time', path: 'live.enabled' }),
+      this.toggle({ label: 'Detect my location', path: 'live.auto' }),
       el('div', { class: 'buttons search' }, cityInput, this.button('Search', search), this.button('Locate me', locate)),
       results,
       liveStatus,

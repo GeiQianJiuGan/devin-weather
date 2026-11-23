@@ -21,7 +21,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildRoom } from '../room/RoomBuilder.js';
 import { WindowGlass } from '../room/WindowGlass.js';
 import { SkyDome } from '../sky/SkyDome.js';
-import { LightingSystem, lateness } from '../systems/LightingSystem.js';
+import { LightingSystem } from '../systems/LightingSystem.js';
 import { TimeSystem } from '../systems/TimeSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
 import { LightningSystem } from '../weather/LightningSystem.js';
@@ -32,6 +32,9 @@ const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Arro
 import { QUALITY } from './PerformanceManager.js';
 import { Rng, clamp, damp, formatHour } from './utils.js';
 
+// the cafe's own lights are on by default between these hours only
+const LIGHTS_ON_HOUR = 18;
+const LIGHTS_OFF_HOUR = 22;
 const CITY_SEED = 20240611;
 const VEHICLE_POOL = 64;
 const BASE_ASPECT = 16 / 9;
@@ -157,6 +160,11 @@ export class App {
     });
     canvas.addEventListener('webglcontextrestored', () => window.location.reload());
     store.subscribe((path) => {
+      // an imported configuration keeps the lights it was saved with
+      if (path === '*') {
+        const h = store.get('time.hour') % 24;
+        this.lightsOn = h >= LIGHTS_ON_HOUR && h < LIGHTS_OFF_HOUR;
+      }
       if (path === 'quality' || path === '*') this.applyQuality();
     });
     perf.onScale = () => this.resize();
@@ -378,7 +386,7 @@ export class App {
 
     this.traffic.setEnabled(state.scene.trafficEnabled);
     this.traffic.setDensity(state.scene.trafficDensity / 100);
-    this.closeForNight(state);
+    this.followLightingHours(state);
     this.lighting.update(dt, simDt, this.time.env, this.weather, this.lightning, state);
     this.interiorScene.environmentIntensity = 0.015 + this.room.lights.fill.intensity * 0.6;
     this.traffic.update(simDt);
@@ -430,29 +438,20 @@ export class App {
 
   /** Skips all running transitions (time easing, weather build-up). Used for testing and captures. */
   /**
-   * The cafe switches its own lights off at closing time and back on in the morning. The
-   * switches in the panel follow, so anything turned on by hand during the night stays on.
+   * The cafe lights its room in the evening only. Whenever the clock enters or leaves those
+   * hours (and when the page opens) the panel switches are set accordingly; in between they
+   * are the visitor's to change.
    */
-  closeForNight(state) {
-    // the selected hour, not the eased clock: an imported configuration is judged by its own time
-    const closed = lateness(state.time.hour % 24) > 0.5;
-    const s = state.scene;
-    // the store remembers the closing, so reloads, imports and resets stay consistent
-    if (closed === s.closedForNight) return;
+  followLightingHours(state) {
+    // the selected hour, not the eased clock
+    const h = state.time.hour % 24;
+    const on = h >= LIGHTS_ON_HOUR && h < LIGHTS_OFF_HOUR;
+    if (on === this.lightsOn) return;
+    this.lightsOn = on;
     const store = this.store;
-    if (closed) {
-      store.set('scene.resumeInteriorLight', s.interiorLightEnabled);
-      store.set('scene.resumeDeskLamp', s.deskLampEnabled);
-      store.set('scene.resumeScreenBrightness', s.computerScreenBrightness);
-      store.set('scene.interiorLightEnabled', false);
-      store.set('scene.deskLampEnabled', false);
-      store.set('scene.computerScreenBrightness', 0);
-    } else {
-      if (!s.interiorLightEnabled) store.set('scene.interiorLightEnabled', s.resumeInteriorLight);
-      if (!s.deskLampEnabled) store.set('scene.deskLampEnabled', s.resumeDeskLamp);
-      if (s.computerScreenBrightness === 0) store.set('scene.computerScreenBrightness', s.resumeScreenBrightness);
-    }
-    store.set('scene.closedForNight', closed);
+    store.set('scene.interiorLightEnabled', on);
+    store.set('scene.deskLampEnabled', on);
+    store.set('scene.computerScreenBrightness', on ? 80 : 0);
   }
 
   settle() {
