@@ -1,4 +1,5 @@
 import {
+  AdditiveBlending,
   BackSide,
   BoxGeometry,
   BufferGeometry,
@@ -29,7 +30,7 @@ import { ROOM, ROOM_ORIGIN } from '../core/layout.js';
 import { buildBack } from './BackRoom.js';
 import { flowerArrangement } from './Plants.js';
 import {
-  ScreenContent, contactShadowTexture, latteTexture, linenTexture, marbleTexture, woodFloorTexture, woodGrainTexture,
+  ScreenContent, contactShadowTexture, coveGlowTexture, latteTexture, linenTexture, marbleTexture, woodFloorTexture, woodGrainTexture,
 } from './textures.js';
 
 // The second-floor cafe: shell with a glazed corner, a marble-topped service
@@ -186,11 +187,52 @@ export function buildRoom() {
   floorTex.repeat.set(W / 2, D / 2);
   flat(W, D, new MeshStandardMaterial({ map: floorTex, color: 0xc9c2b8, roughness: 0.45 }), -W / 2, 0, D / 2);
   box(W + 0.6, 0.2, D + 0.6, M.ceiling, -W / 2, H + 0.1, D / 2);
-  // Exposed timber joists across the room, a wall plate at each end. Every pendant hangs in the
-  // middle of a bay (bay centres at 0.85 + k * 1.1), so no cord meets a joist.
-  for (let z = 0.3; z < D - 0.3; z += 1.1) {
-    box(W, 0.18, 0.14, M.oak, -W / 2, H - 0.09, z);
-    for (const x of [-0.03, -W + 0.03]) box(0.06, 0.05, 0.2, M.black, x, H - 0.205, z).castShadow = false;
+  // Tray ceiling: a dropped border all round, with a light cove along its inner edge that washes
+  // the raised middle (both follow the interior lighting) and downlights let into its underside.
+  const SD = 0.28;
+  const SW = 0.62;
+  const SY = H - SD;
+  box(W, SD, SW, M.ceiling, -W / 2, H - SD / 2, SW / 2);
+  box(W, SD, SW, M.ceiling, -W / 2, H - SD / 2, D - SW / 2);
+  box(SW, SD, D - 2 * SW, M.ceiling, -SW / 2, H - SD / 2, D / 2);
+  box(SW, SD, D - 2 * SW, M.ceiling, -W + SW / 2, H - SD / 2, D / 2);
+  const coveStripMaterial = new MeshBasicMaterial({ color: 0x000000, toneMapped: false });
+  const coveMaterial = new MeshBasicMaterial({
+    color: 0x000000, map: coveGlowTexture(W - 2 * SW, D - 2 * SW), blending: AdditiveBlending, transparent: true, depthWrite: false,
+  });
+  const fieldW = W - 2 * SW;
+  const fieldD = D - 2 * SW;
+  const wash = new Mesh(new PlaneGeometry(fieldW, fieldD), coveMaterial);
+  wash.rotation.x = Math.PI / 2;
+  wash.position.set(-W / 2, H - 0.003, D / 2);
+  group.add(wash);
+  // the cove: a lip stands proud of the border's inner face and hides the strip behind it
+  for (const [len, x, z, alongX] of [[fieldW, -W / 2, SW, true], [fieldW, -W / 2, D - SW, true], [fieldD, -SW, D / 2, false], [fieldD, -W + SW, D / 2, false]]) {
+    const inward = alongX ? (z < D / 2 ? 1 : -1) : (x > -W / 2 ? -1 : 1);
+    const lip = alongX ? [len + 0.1, 0.05, 0.05] : [0.05, 0.05, len + 0.1];
+    const strip = alongX ? [len, 0.016, 0.012] : [0.012, 0.016, len];
+    const off = (d) => (alongX ? [x, z + inward * d] : [x + inward * d, z]);
+    box(...lip, M.ceiling, off(0.025)[0], SY + 0.025, off(0.025)[1]).castShadow = false;
+    const led = new Mesh(new BoxGeometry(...strip), coveStripMaterial);
+    led.position.set(off(0.006)[0], H - 0.04, off(0.006)[1]);
+    group.add(led);
+  }
+  // downlights: a white trim ring and a lit lens, evenly spaced along each run of the border
+  const downlight = (x, z) => {
+    cyl(0.058, 0.058, 0.006, M.ceiling, x, SY - 0.003, z, group, 28).castShadow = false;
+    const lens = new Mesh(new CylinderGeometry(0.04, 0.04, 0.004, 24), coveStripMaterial);
+    lens.position.set(x, SY - 0.0065, z);
+    group.add(lens);
+  };
+  for (let k = 0; k < 6; k++) {
+    const x = -W + SW + 0.35 + (k * (fieldW - 0.7)) / 5;
+    downlight(x, SW / 2);
+    downlight(x, D - SW / 2);
+  }
+  for (let k = 0; k < 5; k++) {
+    const z = SW + 0.35 + (k * (fieldD - 0.7)) / 4;
+    downlight(-SW / 2, z);
+    downlight(-W + SW / 2, z);
   }
   // the solid walls run up into the ceiling slab so no daylight shows along the joint
   box(0.2, H + 0.1, D + 0.4, M.wall, -W - 0.1, H / 2 + 0.05, D / 2);
@@ -609,6 +651,16 @@ export function buildRoom() {
     pendantDome((cx0 + cx1) / 2, 2.12, z);
     return new Vector3((cx0 + cx1) / 2, 2.14, z).add(ROOM_ORIGIN);
   });
+  // A timber slat raft hung over the counter; the dome cords drop through the gaps between slats.
+  const raftX = (cx0 + cx1) / 2;
+  const raftZ0 = 1.5;
+  const raftZ1 = D - SW - 0.1;
+  const raftY = 2.76;
+  for (let k = -5; k < 5; k++) box(0.03, 0.09, raftZ1 - raftZ0, M.oak, raftX + (k + 0.5) * 0.1, raftY + 0.045, (raftZ0 + raftZ1) / 2);
+  for (const z of [1.6, 2.5, 3.6, 4.7, 5.8]) {
+    box(1.0, 0.04, 0.04, M.oak, raftX, raftY + 0.11, z);
+    for (const sgn of [-1, 1]) stick(v(raftX + sgn * 0.4, raftY + 0.13, z), v(raftX + sgn * 0.4, H, z), 0.005, M.black).castShadow = false;
+  }
   // Over the window tables: enamelled spun-metal shades on a twisted cord, each with a brass
   // lamp holder, a vented neck and a frosted bulb that sits just above the rim.
   const pendantShadeProfile = [
@@ -734,6 +786,8 @@ export function buildRoom() {
     domeInnerMaterial: domeInner,
     curtainMaterial,
     sconceMaterial,
+    coveMaterial,
+    coveStripMaterial,
     shadeInnerMaterial: pendantShadeInner,
     anchors: {
       screen: screenCenter,

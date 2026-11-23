@@ -49,11 +49,11 @@ export function buildBack(K) {
   for (const [a, b] of [[-W, doorX - doorHalf], [doorX + doorHalf, 0]]) {
     panelling(against((a + b) / 2, D, SOUTH), b - a);
   }
-  // plaster cornice where the walls meet the ceiling
+  // plaster cornice where the walls meet the dropped border of the ceiling (0.28 below the slab)
   for (const [x, z, rot, len] of [[-W, D / 2, WEST, D], [-W / 2, D, SOUTH, W], [-(W + GN) / 2, 0, 0, W - GN], [0, (D + GE) / 2, EAST, D - GE]]) {
     const g = against(x, z, rot);
-    box(len, 0.09, 0.05, M.ceiling, 0, H - 0.045, 0.025, g).castShadow = false;
-    box(len, 0.04, 0.09, M.ceiling, 0, H - 0.02, 0.045, g).castShadow = false;
+    box(len, 0.09, 0.05, M.ceiling, 0, H - 0.325, 0.025, g).castShadow = false;
+    box(len, 0.04, 0.09, M.ceiling, 0, H - 0.3, 0.045, g).castShadow = false;
   }
 
   // --- entrance: one panelled door beside the counter ----------------------------------------

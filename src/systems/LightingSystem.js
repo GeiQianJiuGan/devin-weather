@@ -251,6 +251,8 @@ export class LightingSystem {
     this.room.globeMaterial.color.copy(WARM).multiplyScalar(0.12 + 0.2 * clamp(lum, 0, 1) + 2.2 * lv.interior);
     this.room.shadeInnerMaterial.emissiveIntensity = 1.5 * lv.interior;
     this.room.sconceMaterial.emissiveIntensity = 0.05 + 1.3 * lv.interior;
+    this.room.coveMaterial.color.copy(WARM).multiplyScalar(0.5 * lv.interior);
+    this.room.coveStripMaterial.color.copy(WARM).multiplyScalar(0.05 + 4 * lv.interior);
     this.room.domeInnerMaterial.color.copy(WARM).multiplyScalar(0.03 + 1.6 * lv.interior);
 
     // monitor: dims itself a little in a dark room, but is always a cool light source

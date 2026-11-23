@@ -393,6 +393,26 @@ export function sheerCurtainTexture() {
   return toTexture(c);
 }
 
+/** Wash of light on a recessed ceiling from a cove along its edges: bright at the rim, gone within a metre. */
+export function coveGlowTexture(w, h) {
+  const N = 256;
+  const [c, g] = canvas(N, N);
+  const img = g.createImageData(N, N);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const x = ((i + 0.5) / N) * w;
+      const y = ((j + 0.5) / N) * h;
+      const glow = (d) => Math.exp(-d / 0.38);
+      const a = Math.min(1, glow(x) + glow(w - x) + glow(y) + glow(h - y));
+      const k = (j * N + i) * 4;
+      img.data[k] = img.data[k + 1] = img.data[k + 2] = Math.round(255 * a);
+      img.data[k + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return toTexture(c);
+}
+
 /** One line of lettering on a flat ground. */
 export function signTexture(text, ground, ink) {
   const [c, g] = canvas(512, 128);
