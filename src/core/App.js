@@ -250,6 +250,7 @@ export class App {
   }
 
   onWheel(e) {
+    if (e.ctrlKey || e.metaKey) return; // browser zoom
     e.preventDefault();
     const v = this.view;
     // wheels report pixels, lines or pages depending on the device
