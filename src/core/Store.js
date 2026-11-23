@@ -52,6 +52,11 @@ export function createDefaultState() {
       interiorLightEnabled: true,
       deskLampEnabled: true,
       computerScreenBrightness: 80,
+      // closing time: the cafe has switched its lights off, and what to switch back on at dawn
+      closedForNight: false,
+      resumeInteriorLight: true,
+      resumeDeskLamp: true,
+      resumeScreenBrightness: 80,
     },
     playback: { paused: false },
     quality: 'high',
@@ -75,6 +80,10 @@ const SCHEMA = {
   'scene.interiorLightEnabled': bool,
   'scene.deskLampEnabled': bool,
   'scene.computerScreenBrightness': num(0, 100),
+  'scene.closedForNight': bool,
+  'scene.resumeInteriorLight': bool,
+  'scene.resumeDeskLamp': bool,
+  'scene.resumeScreenBrightness': num(0, 100),
   'playback.paused': bool,
   quality: { kind: 'enum', values: QUALITY_LEVELS },
 };

@@ -435,26 +435,23 @@ export class App {
    */
   closeForNight(state) {
     const closed = lateness(this.time.env.hour) > 0.5;
-    if (closed === this.closed) return;
-    this.closed = closed;
     const s = state.scene;
+    // the store remembers the closing, so reloads, imports and resets stay consistent
+    if (closed === s.closedForNight) return;
+    const store = this.store;
     if (closed) {
-      this.beforeClosing = {
-        interiorLightEnabled: s.interiorLightEnabled,
-        deskLampEnabled: s.deskLampEnabled,
-        computerScreenBrightness: s.computerScreenBrightness,
-      };
-      this.store.set('scene.interiorLightEnabled', false);
-      this.store.set('scene.deskLampEnabled', false);
-      this.store.set('scene.computerScreenBrightness', 0);
+      store.set('scene.resumeInteriorLight', s.interiorLightEnabled);
+      store.set('scene.resumeDeskLamp', s.deskLampEnabled);
+      store.set('scene.resumeScreenBrightness', s.computerScreenBrightness);
+      store.set('scene.interiorLightEnabled', false);
+      store.set('scene.deskLampEnabled', false);
+      store.set('scene.computerScreenBrightness', 0);
     } else {
-      // nothing remembered (page loaded during the night): open with everything on
-      const was = this.beforeClosing ?? { interiorLightEnabled: true, deskLampEnabled: true, computerScreenBrightness: 80 };
-      if (!s.interiorLightEnabled) this.store.set('scene.interiorLightEnabled', was.interiorLightEnabled);
-      if (!s.deskLampEnabled) this.store.set('scene.deskLampEnabled', was.deskLampEnabled);
-      if (s.computerScreenBrightness === 0) this.store.set('scene.computerScreenBrightness', was.computerScreenBrightness);
-      this.beforeClosing = null;
+      if (!s.interiorLightEnabled) store.set('scene.interiorLightEnabled', s.resumeInteriorLight);
+      if (!s.deskLampEnabled) store.set('scene.deskLampEnabled', s.resumeDeskLamp);
+      if (s.computerScreenBrightness === 0) store.set('scene.computerScreenBrightness', s.resumeScreenBrightness);
     }
+    store.set('scene.closedForNight', closed);
   }
 
   settle() {
