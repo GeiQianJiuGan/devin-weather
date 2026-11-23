@@ -19,6 +19,7 @@ varying vec3 vBSize;
 varying vec4 vBStyle;
 varying vec3 vBTint;
 varying vec4 vBMisc;
+varying vec3 vBView;
 `;
 
 const VERT_BEGIN = /* glsl */ `
@@ -28,6 +29,11 @@ vBSize = aSize;
 vBStyle = aStyle;
 vBTint = aTint;
 vBMisc = aMisc;
+vec4 bWorld = vec4(transformed, 1.0);
+#ifdef USE_INSTANCING
+  bWorld = instanceMatrix * bWorld;
+#endif
+vBView = (modelMatrix * bWorld).xyz - cameraPosition;
 `;
 
 const FRAG_PARS = /* glsl */ `
@@ -44,6 +50,7 @@ varying vec3 vBSize;
 varying vec4 vBStyle;
 varying vec3 vBTint;
 varying vec4 vBMisc;
+varying vec3 vBView;
 
 float bHash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -65,6 +72,26 @@ float bNoise(vec2 p) {
 float bBand(float x, float lo, float hi, float aa) {
   return smoothstep(lo - aa, lo + aa, x) - smoothstep(hi - aa, hi + aa, x);
 }
+// What a window pane mirrors: sky with a little cloud, the skyline of the buildings across
+// the street (with their own lit windows at night) and the dark street below.
+vec3 bEnv(vec3 R, float seed, float detail) {
+  float up = R.y;
+  float az = atan(R.x, R.z);
+  float a1 = az * 5.0 + seed;
+  float h1 = 0.08 + 0.5 * bHash(vec2(floor(a1), 3.0)) * bHash(vec2(floor(a1 * 0.37), 9.0));
+  float h2 = 0.03 + 0.2 * bHash(vec2(floor(az * 11.0 + seed * 2.0), 5.0));
+  float h = max(h1, h2);
+  vec3 sky = uSkyRefl * mix(1.35, 0.75, smoothstep(0.0, 0.8, up));
+  float cl = bNoise(R.xz / (abs(up) + 0.25) * 1.2 + 4.0);
+  sky *= 0.85 + 0.4 * smoothstep(0.4, 0.8, cl);
+  vec3 bld = uSkyRefl * (0.16 + 0.22 * bHash(vec2(floor(a1), 1.0)));
+  vec2 wg = vec2(az * 240.0, up * 150.0);
+  float wl = step(0.8, bHash(floor(wg) + seed)) * step(0.3, fract(wg.x)) * step(0.35, fract(wg.y));
+  bld += vec3(1.0, 0.72, 0.42) * wl * uCityLights * 0.1 * detail;
+  vec3 street = uSkyRefl * 0.1 + vec3(1.0, 0.7, 0.4) * 0.04 * uCityLights;
+  vec3 c = mix(bld, sky, smoothstep(h - 0.015, h + 0.015, up));
+  return mix(street, c, smoothstep(-0.06, 0.0, up));
+}
 vec3 bSignColor(float h) {
   if (h < 0.2) return vec3(1.0, 0.13, 0.10);
   if (h < 0.4) return vec3(1.0, 0.58, 0.10);
@@ -80,6 +107,8 @@ vec3 bAlb = vec3(0.2);
 vec3 bEmit = vec3(0.0);
 float bRough = 0.9;
 float bGlass = 0.0;
+vec3 bRefl = vec3(0.0);
+float bFlatRefl = 1.0;
 {
   vec3 lp = vBPos;
   vec3 bsize = vBSize;
@@ -185,21 +214,93 @@ float bGlass = 0.0;
     wall = mix(wall, frameC * (0.85 + 0.15 * wn), surround);
     float reveal = smoothstep(0.5 * vBStyle.w - 0.16, 0.5 * vBStyle.w, fc.y - 0.5) * (1.0 - lod);
 
-    float blind = step(0.78, r.z) * (1.0 - isLit) * (1.0 - lod);
-    vec3 glassC = mix(vec3(0.025, 0.035, 0.05), vec3(0.42, 0.40, 0.36), blind * 0.8);
+    // --- glazing: sashes, blinds and curtains, a room behind the glass, mirrored street ----
+    float near = 1.0 - lod;
+    vec3 tdir = mix(vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), isX);
+    vec3 Vw = normalize(vBView);
+    vec2 wp = (fc - 0.5) * vec2(cw, fh);
+    vec2 wh = 0.5 * vec2(cw, fh) * vBStyle.zw;
+    float hasMull = step(0.45, vBStyle.z);
+    // sash frame, centre mullion, and a meeting rail (offices: the rail above a spandrel ceilPanel)
+    float sashW = mix(0.05, 0.035, office);
+    float railY = mix(0.0, -wh.y * 0.42, office);
+    float edgeBar = 1.0 - smoothstep(sashW - fwU, sashW + fwU, wh.x - abs(wp.x)) * smoothstep(sashW - fwV, sashW + fwV, wh.y - abs(wp.y));
+    float vBar = (1.0 - smoothstep(0.5 * sashW - fwU, 0.5 * sashW + fwU, abs(wp.x))) * hasMull;
+    float hBar = 1.0 - smoothstep(0.5 * sashW - fwV, 0.5 * sashW + fwV, abs(wp.y - railY));
+    float bars = max(edgeBar, max(vBar, hBar)) * near * (1.0 - smoothstep(0.03, 0.1, max(fwU, fwV)));
+    float spandrel = office * (1.0 - smoothstep(railY - fwV, railY + fwV, wp.y)) * near;
+    vec3 sashC = mix(mix(vec3(0.7, 0.69, 0.65), vec3(0.16, 0.13, 0.11), step(0.6, fract(seed * 0.61))), vec3(0.2, 0.21, 0.22), office);
+
+    // every pane sits a little differently in its frame, so each mirrors a different bit of street
+    vec2 pane = vec2(step(0.0, wp.x) * hasMull, step(railY, wp.y));
+    vec3 paneH = bHash3(id * 2.0 + pane + vec2(seed * 3.0, faceId));
+    float ripple = bNoise(vec2(fu, fv) * 1.3 + seed) - 0.5;
+    vec3 nW = normalize(vBNrm + near * (tdir * ((paneH.x - 0.5) * 0.06 + ripple * 0.03) + vec3(0.0, (paneH.y - 0.5) * 0.06, 0.0)));
+    vec3 Rw = reflect(Vw, nW);
+    float ndv = clamp(dot(-Vw, nW), 0.0, 1.0);
+    float f0 = mix(mix(0.08, 0.2, office), 0.3, spandrel);
+    float fres = f0 + (1.0 - f0) * pow(1.0 - ndv, 5.0);
+
+    // the room behind the glass (interior mapping): walls, ceiling, floor, something on the back wall
+    vec3 vf = vec3(dot(Vw, tdir), Vw.y, max(-dot(Vw, vBNrm), 0.03));
+    vf += step(abs(vf), vec3(1e-3)) * 2e-3;
+    float depth = mix(mix(3.0, 5.0, r.y), 7.5, office);
+    vec3 bmin = vec3(-0.5 * cw, -0.5 * fh, 0.0);
+    vec3 bmax = vec3(0.5 * cw, 0.5 * fh - 0.28, depth);
+    vec3 ro = vec3(wp, 0.0);
+    vec3 tt = (mix(bmin, bmax, step(0.0, vf)) - ro) / vf;
+    vec3 hp = ro + vf * min(tt.x, min(tt.y, tt.z));
+    float isBack = step(tt.z, min(tt.x, tt.y));
+    float isSide = (1.0 - isBack) * step(tt.x, tt.y);
+    float isCeil = (1.0 - isBack) * (1.0 - isSide) * step(0.0, vf.y);
+    float isFloor = (1.0 - isBack) * (1.0 - isSide) * (1.0 - step(0.0, vf.y));
+    vec3 roomH = bHash3(id + vec2(seed * 11.0, faceId * 3.0));
+    vec3 wallC = mix(mix(vec3(0.74, 0.69, 0.6), vec3(0.58, 0.64, 0.68), roomH.x), vec3(0.7, 0.71, 0.72), office) * (0.75 + 0.25 * roomH.y);
+    vec3 floorC = mix(vec3(0.3, 0.2, 0.13), vec3(0.22, 0.23, 0.25), office);
+    vec3 surf = wallC * (isBack + 0.82 * isSide) + vec3(0.85) * isCeil + floorC * isFloor;
+    // back wall: a picture or shelf, and furniture standing against it
+    float pic = bBand(hp.x - (roomH.z - 0.5) * cw * 0.4, -0.38, 0.38, 0.02) * bBand(hp.y, -0.05, 0.5, 0.02) * (1.0 - office);
+    surf = mix(surf, 0.25 + 0.5 * bHash3(id + 5.0), pic * isBack * 0.8);
+    float furnH = -0.5 * fh + mix(0.75, 1.25, bHash(vec2(floor(hp.x / 0.9 + roomH.z * 5.0), id.x + id.y * 7.0)));
+    surf = mix(surf, mix(vec3(0.2, 0.13, 0.09), vec3(0.16, 0.17, 0.2), office), isBack * (1.0 - smoothstep(furnH - 0.02, furnH + 0.02, hp.y)) * 0.85);
+    // light inside: one warm ceiling lamp at home, rows of ceiling panels in offices
+    vec3 lampP = vec3((roomH.y - 0.5) * cw * 0.3, bmax.y - 0.35, depth * 0.45);
+    vec3 dl = hp - lampP;
+    float lampFall = 0.22 + 1.5 / (1.0 + 0.55 * dot(dl, dl));
+    float ceilPanel = isCeil * step(0.55, fract(hp.z * 0.7)) * step(0.3, fract(hp.x * 0.9 + 0.2));
+    float litShade = mix(lampFall, 0.75 + 2.2 * ceilPanel, office);
+    vec3 roomLit = surf * litShade;
+    vec3 roomDay = surf * (0.015 + 0.2 * exp(-hp.z * 0.6));
+
+    // blinds lowered part of the way, or curtains drawn in from the sides
+    float blindOn = step(mix(0.72, 0.5, office), r.z) * near;
+    float blindDrop = fract(r.z * 7.3) * mix(1.0, 0.75, isLit);
+    float slatB = 1.0 - 0.3 * step(0.6, fract(fv / 0.05)) * (1.0 - smoothstep(0.015, 0.04, fwV));
+    float blind = blindOn * smoothstep(wh.y * (1.0 - 2.0 * blindDrop) - fwV, wh.y * (1.0 - 2.0 * blindDrop) + fwV, wp.y) * (1.0 - spandrel);
+    float drawn = 0.25 + 0.6 * r.z;
+    float curtain = step(0.5, r.x) * (1.0 - office) * near * (1.0 - blindOn) * smoothstep(wh.x * drawn - 0.015, wh.x * drawn + 0.015, abs(wp.x));
+    float fold = 0.72 + 0.28 * sin(fu * 46.0 + 2.5 * sin(fv * 1.3 + r.y * 6.0)) * (1.0 - smoothstep(0.02, 0.06, fwU));
+    vec3 curtainC = mix(vec3(0.66, 0.62, 0.55), 0.3 + 0.45 * roomH, 0.5) * fold;
+    float cover = max(blind, curtain);
+    vec3 coverC = mix(vec3(0.66, 0.64, 0.6) * slatB, curtainC, curtain);
+
+    vec3 glassC = mix(roomDay, coverC * 0.55, cover);
     glassC = mix(glassC, glassC * (0.6 + 0.8 * vBTint), step(1.5, kind) * 0.5);
-    // curtains drawn part-way across some lit windows
-    float curtain = step(0.55, r.x) * (1.0 - office) * (1.0 - lod) * step(abs(fc.x - 0.5), 0.5 * vBStyle.z) * smoothstep(0.5 * vBStyle.z * (0.25 + 0.6 * r.z), 0.5 * vBStyle.z * (0.25 + 0.6 * r.z) + 0.02, abs(fc.x - 0.5));
-    bEmit *= 1.0 - 0.45 * curtain;
+    glassC = mix(glassC, vBTint * 0.22, spandrel);
+    glassC = mix(glassC, sashC, bars);
+    glassC = mix(vec3(0.03, 0.04, 0.055), glassC, near);
+    vec3 emitNear = lc * (0.25 + 0.9 * r.z * r.z) * isLit * uWindowGain * mix(roomLit * 1.5, coverC * 0.8, cover) * (1.0 - bars) * (1.0 - spandrel);
+    bEmit = mix(emitNear, emitAvg, lod) * winL;
     bEmit *= 1.0 - 0.35 * reveal;
-    glassC = mix(glassC, vec3(0.34, 0.31, 0.27), curtain * 0.6);
     float solid = max(max(pier, bayPier), max(belt, coping));
     winL *= (1.0 - solid) * (1.0 - mechBand);
     bEmit *= (1.0 - solid) * (1.0 - mechBand);
     wall = mix(wall, trimC, max(max(pier, bayPier) * 0.8, max(belt, coping)));
     wall = mix(wall, vBTint * 0.42 * louvre, mechBand * (1.0 - pier));
-    bAlb = mix(wall, glassC * mull * (1.0 - 0.5 * reveal), winL);
-    bGlass = winL * (1.0 - blind) * (1.0 - 0.7 * curtain);
+    bAlb = mix(wall, glassC * (1.0 - 0.5 * reveal), winL);
+    bGlass = winL * (1.0 - bars);
+    bRefl = bEnv(Rw, seed, near) * fres * bGlass * (1.0 - 0.4 * reveal);
+    bFlatRefl = 1.0 - winL;
     bRough = mix(0.9, 0.12, bGlass);
 
     // ---- ground-floor shop fronts: stone pilasters and cornice, painted fascia signs from the
@@ -371,7 +472,8 @@ const FRAG_EMISSIVE = /* glsl */ `
 {
   float ndv = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
   float fres = 0.06 + 0.94 * pow(1.0 - ndv, 3.0);
-  totalEmissiveRadiance += bEmit + uSkyRefl * fres * bGlass * 0.55;
+  // shopfront glass keeps the plain sky mirror; upper windows carry their own reflection
+  totalEmissiveRadiance += bEmit + bRefl + uSkyRefl * fres * bGlass * 0.55 * bFlatRefl;
 }
 `;
 
