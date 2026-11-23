@@ -1,13 +1,13 @@
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, RepeatWrapping } from 'three';
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial, PlaneGeometry, RepeatWrapping } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Rng } from '../core/utils.js';
 import { ROOM } from '../core/layout.js';
 import { broadLeafPlant, flowerArrangement, leafyPlant } from './Plants.js';
-import { artPrintTexture, linenTexture, reededGlassTexture, signTexture } from './textures.js';
+import { artPrintTexture, linenTexture, reededGlassTexture, sheerCurtainTexture } from './textures.js';
 
 // The half of the cafe away from the windows, which the free camera can turn to:
 // panelled walls, the stair-hall entrance, a banquette with tables for two, a shared
-// table, a reading corner by the bookcase and the staff end behind the counter.
+// table, a reading corner by the bookcase and a curtained window. The stair-hall door is the only way in.
 // `K` is the builder's kit of mesh helpers and shared materials.
 
 export function buildBack(K) {
@@ -42,12 +42,10 @@ export function buildBack(K) {
   };
   const doorX = -6.75; // entrance, centre
   const doorHalf = 0.84;
-  const staffX = -0.8;
-  const staffHalf = 0.5;
   panelling(against(-W, D / 2, WEST), D);
   panelling(against(-(W + GN) / 2, 0, 0), W - GN);
   panelling(against(0, (D + GE) / 2, EAST), D - GE);
-  for (const [a, b] of [[-W, doorX - doorHalf], [doorX + doorHalf, staffX - staffHalf], [staffX + staffHalf, 0]]) {
+  for (const [a, b] of [[-W, doorX - doorHalf], [doorX + doorHalf, 0]]) {
     panelling(against((a + b) / 2, D, SOUTH), b - a);
   }
   // plaster cornice where the walls meet the ceiling
@@ -82,13 +80,6 @@ export function buildBack(K) {
     rbox(0.24, 0.05, 0.055, 0.008, M.steelBrushed, s * (leafW - 0.2), DH - 0.09, 0.08, entrance); // closer
     stick(v(s * (leafW - 0.3), DH - 0.09, 0.09), v(s * (leafW - 0.02), DH + 0.02, 0.1), 0.006, M.steelBrushed, entrance);
   }
-  const exitSign = new Mesh(
-    new PlaneGeometry(0.34, 0.1275),
-    new MeshBasicMaterial({ map: signTexture('EXIT', '#0f6a3c', '#eaf6ee'), color: 0x8c8c8c }),
-  );
-  exitSign.position.set(0, DH + 0.27, 0.047);
-  entrance.add(exitSign);
-  rbox(0.38, 0.165, 0.045, 0.008, M.black, 0, DH + 0.27, 0.023, entrance);
   box(1.5, 0.014, 0.9, mat(0x3b3027, 1), 0, 0.007, 0.56, entrance); // coir mat
   box(1.56, 0.008, 0.96, M.black, 0, 0.004, 0.56, entrance);
   // umbrella stand between the door and the banquette
@@ -130,7 +121,7 @@ export function buildBack(K) {
     }
   });
   cup(bcx + 0.1, TABLE_TOP, tz - 0.08, group, { rot: 2.2 });
-  // prints over the banquette, one more beyond the bookcase
+  // prints over the banquette
   const print = (g, x, y, w, h, seed, frame) => {
     box(w + 0.05, h + 0.05, 0.028, frame, x, y, 0.016, g);
     const face = new Mesh(new PlaneGeometry(w, h), new MeshStandardMaterial({ map: artPrintTexture(seed), roughness: 0.9 }));
@@ -139,7 +130,6 @@ export function buildBack(K) {
     g.add(face);
   };
   [-1.1, 0, 1.1].forEach((dx, i) => print(banquette, dx, 1.95 + (i === 1 ? 0.06 : 0), i === 1 ? 0.72 : 0.54, i === 1 ? 0.96 : 0.72, 5 + i * 3, i === 1 ? M.oak : M.black));
-  print(against(-W, 5.75, WEST), 0, 1.95, 0.84, 1.12, 21, M.oak);
 
   // --- shared table --------------------------------------------------------------------
   const sx = -4.4;
@@ -283,15 +273,7 @@ export function buildBack(K) {
   for (let k = 0; k < 2; k++) rbox(0.15, 0.022, 0.21, 0.004, k ? M.cabinet : M.paper, nx + 0.06, 0.437 + k * 0.022, 3.06).rotation.y = 0.4 + k * 0.3;
   cup(nx + 0.24, 0.426, 2.9, group, { rot: 0.4 });
 
-  // --- staff end behind the counter ---------------------------------------------------------
-  const staff = against(staffX, D, SOUTH);
-  for (const s of [-1, 1]) box(0.06, 2.14, 0.1, M.oak, s * (staffHalf - 0.03), 1.07, 0.02, staff);
-  box(staffHalf * 2, 0.06, 0.1, M.oak, 0, 2.14, 0.02, staff);
-  box(staffHalf * 2 - 0.12, 2.1, 0.04, M.cabinet, 0, 1.06, 0.02, staff);
-  for (const y of [0.55, 1.5]) rbox(staffHalf * 2 - 0.34, y < 1 ? 0.7 : 0.9, 0.012, 0.004, M.cabinet, 0, y, 0.044, staff);
-  lathe([[0, 0], [0.026, 0], [0.026, 0.006], [0.01, 0.012], [0.01, 0.03], [0.026, 0.045], [0.022, 0.06], [0, 0.064]], M.brass, 0, 0, 0, staff, 20)
-    .position.set(staffHalf - 0.18, 1.02, 0.04);
-  staff.children[staff.children.length - 1].rotation.x = Math.PI / 2;
+  // --- shelves behind the counter ---------------------------------------------------------
   const shelves = against(0, (D + GE) / 2, EAST);
   const SL = D - GE - 0.5;
   for (const y of [1.36, 1.78]) {
@@ -312,6 +294,42 @@ export function buildBack(K) {
     }
   }
 
+  // --- window on the west wall ---------------------------------------------------------------
+  // It gives onto the light well, so a sheer curtain stays drawn across it; the daylight comes through.
+  const win = against(-W, 5.7, WEST);
+  const WW = 1.5;
+  const wy0 = PANEL_H + 0.1;
+  const wy1 = 2.62;
+  const wyc = (wy0 + wy1) / 2;
+  for (const s of [-1, 1]) box(0.09, wy1 - wy0 + 0.18, 0.05, M.wall, s * (WW / 2 + 0.045), wyc, 0.025, win);
+  box(WW + 0.26, 0.09, 0.06, M.wall, 0, wy1 + 0.045, 0.03, win);
+  slab(WW + 0.3, 0.04, 0.16, M.oak, 0, wy0 - 0.02, 0.08, win);
+  box(WW, wy1 - wy0, 0.01, M.frame, 0, wyc, 0.006, win);
+  const CW = WW + 0.5;
+  const CH = wy1 + 0.16 - wy0;
+  const curtainGeo = new PlaneGeometry(CW, CH, 96, 1);
+  const cp = curtainGeo.getAttribute('position');
+  for (let i = 0; i < cp.count; i++) {
+    const x = cp.getX(i);
+    // pleats gathered at the rod, falling looser towards the hem
+    const loose = cp.getY(i) < 0 ? 1.25 : 0.8;
+    cp.setZ(i, (Math.sin(x * 46) * 0.018 + Math.sin(x * 19 + 1.3) * 0.008) * loose);
+  }
+  curtainGeo.computeVertexNormals();
+  const curtainMaterial = new MeshStandardMaterial({
+    color: 0xe9e4d8, roughness: 0.95, emissive: 0x000000, emissiveMap: sheerCurtainTexture(),
+  });
+  const curtain = new Mesh(curtainGeo, curtainMaterial);
+  curtain.position.set(0, wy0 + CH / 2 + 0.01, 0.1);
+  curtain.receiveShadow = true;
+  win.add(curtain);
+  stick(v(-CW / 2 - 0.06, wy1 + 0.19, 0.1), v(CW / 2 + 0.06, wy1 + 0.19, 0.1), 0.011, M.brass, win);
+  for (const s of [-1, 1]) {
+    stick(v(s * (CW / 2 - 0.05), wy1 + 0.19, 0), v(s * (CW / 2 - 0.05), wy1 + 0.19, 0.1), 0.007, M.brass, win);
+    lathe([[0, 0], [0.02, 0.004], [0.024, 0.02], [0.016, 0.036], [0, 0.04]], M.brass, 0, 0, 0, win, 16).position.set(s * (CW / 2 + 0.06), wy1 + 0.19, 0.1);
+    win.children[win.children.length - 1].rotation.z = -s * Math.PI / 2;
+  }
+
   // --- greenery -------------------------------------------------------------------------
   for (const [seed, scale, x, z] of [[11, 3.1, -7.7, 0.72], [19, 2.6, -8.0, 6.55]]) {
     const plant = leafyPlant(seed, 0.058, 0.1);
@@ -320,4 +338,5 @@ export function buildBack(K) {
     group.add(plant);
     blob(0.6, 0.6, x, z, 0.5);
   }
+  return { curtainMaterial };
 }

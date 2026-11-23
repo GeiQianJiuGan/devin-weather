@@ -372,15 +372,23 @@ export function reededGlassTexture() {
   return toTexture(c, true);
 }
 
-/** Lettered sign, light text on a flat ground. */
-export function signTexture(text, ground, ink) {
-  const [c, g] = canvas(512, 192);
-  g.fillStyle = ground;
-  g.fillRect(0, 0, 512, 192);
-  g.fillStyle = ink;
-  g.font = '600 120px "Helvetica Neue", Arial, sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(text, 256, 102);
+/** Light through a drawn sheer: bright panes, the shadow of the sash bars, a darker hem. */
+export function sheerCurtainTexture() {
+  const [c, g] = canvas(256, 256);
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#6a6a6a');
+  grad.addColorStop(0.12, '#ffffff');
+  grad.addColorStop(0.86, '#e8e8e8');
+  grad.addColorStop(1, '#5a5a5a');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  g.filter = 'blur(5px)';
+  g.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  g.fillRect(0, 0, 34, 256);
+  g.fillRect(222, 0, 34, 256);
+  g.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  g.fillRect(123, 20, 10, 216);
+  g.fillRect(34, 116, 188, 9);
+  g.filter = 'none';
   return toTexture(c);
 }

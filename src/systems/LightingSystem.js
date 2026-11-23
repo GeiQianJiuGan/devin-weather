@@ -233,6 +233,7 @@ export class LightingSystem {
     // the glass walls glow with the sky (day) or the street (night)
     const windowGlow = _b.copy(ambient).multiplyScalar(0.5);
     mad(mad(mad(windowGlow, STREETLIGHT_COLOR, 0.035 * lampsOn), cityGlow, 0.5), FLASH_COLOR, flash * 0.9);
+    this.room.curtainMaterial.emissive.copy(windowGlow).multiplyScalar(0.55);
     L.windowNorth.color.copy(windowGlow);
     L.windowEast.color.copy(windowGlow);
     L.windowNorth.intensity = 1;
