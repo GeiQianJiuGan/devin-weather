@@ -6,7 +6,7 @@
 - Port 5173 may already be taken on this machine; Vite then picks the next free port.
 - All assets are procedural (canvas textures, shaders). Do not add image or video assets to the app
   (`docs/images/` holds README screenshots only). The only network use is `src/systems/LiveWeather.js`
-  (Open-Meteo, keyless), and only while live mode is on.
+  (Open-Meteo plus IP location lookups, all keyless), and only while live mode is on.
 - State lives in `src/core/Store.js`; every setting must go through its schema.
 - Shader rule: never call `pow()` with a base that can be negative (interpolants overshoot at
   MSAA edges and produce NaN that the bloom then spreads).

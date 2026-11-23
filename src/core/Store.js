@@ -44,7 +44,7 @@ export function periodForHour(hour) {
 export function createDefaultState() {
   return {
     weather: { type: 'rain_moderate', intensity: 55, windStrength: 35 },
-    time: { preset: 'night', hour: 22, autoCycle: false, cycleSpeed: 20 },
+    time: { preset: 'night', hour: 20, autoCycle: false, cycleSpeed: 20 },
     scene: {
       trafficEnabled: true,
       trafficDensity: 65,
@@ -53,14 +53,9 @@ export function createDefaultState() {
       interiorLightEnabled: true,
       deskLampEnabled: true,
       computerScreenBrightness: 80,
-      // closing time: the cafe has switched its lights off, and what to switch back on at dawn
-      closedForNight: false,
-      resumeInteriorLight: true,
-      resumeDeskLamp: true,
-      resumeScreenBrightness: 80,
     },
     // live mode: follow the current weather and local time of a real place
-    live: { enabled: false, city: '北京', lat: 39.9042, lon: 116.4074 },
+    live: { enabled: true, auto: true, city: '北京', lat: 39.9042, lon: 116.4074 },
     playback: { paused: false },
     quality: 'high',
   };
@@ -83,11 +78,8 @@ const SCHEMA = {
   'scene.interiorLightEnabled': bool,
   'scene.deskLampEnabled': bool,
   'scene.computerScreenBrightness': num(0, 100),
-  'scene.closedForNight': bool,
-  'scene.resumeInteriorLight': bool,
-  'scene.resumeDeskLamp': bool,
-  'scene.resumeScreenBrightness': num(0, 100),
   'live.enabled': bool,
+  'live.auto': bool,
   'live.city': { kind: 'string', max: 40 },
   'live.lat': num(-90, 90),
   'live.lon': num(-180, 180),
@@ -124,6 +116,9 @@ export function sanitizeState(input) {
     const value = coerce(rule, raw);
     if (value !== undefined) writePath(state, path, value);
   }
+  // a place without the `auto` field was saved before automatic location existed: it was chosen by hand
+  const live = input.live;
+  if (live && typeof live === 'object' && live.auto === undefined && live.lat !== undefined && live.lon !== undefined) state.live.auto = false;
   return state;
 }
 

@@ -3,6 +3,9 @@ import { periodForHour } from '../core/Store.js';
 
 // Live mode: the scene follows the current weather and local time of a real city.
 // Data comes from Open-Meteo (no key needed); nothing is requested unless live mode is on.
+// With automatic location the place is looked up from the visitor's IP address (no permission
+// prompt; browser geolocation is unreliable in mainland China) and the clock starts from the
+// browser's own time zone.
 
 const FORECAST = 'https://api.open-meteo.com/v1/forecast';
 const GEOCODE = 'https://geocoding-api.open-meteo.com/v1/search';
@@ -74,6 +77,28 @@ export async function searchCity(name) {
   }));
 }
 
+// keyless IP location services, tried in order
+const LOCATORS = [
+  ['https://ipwho.is/?lang=zh-CN&fields=success,city,region,latitude,longitude', (d) => d.success !== false && d],
+  ['https://api.ip.sb/geoip', (d) => d],
+];
+
+/** Approximate place of the visitor, from the IP address. No further service is asked once `cancelled()` is true. */
+export async function locateByIp(cancelled = () => false) {
+  for (const [url, pick] of LOCATORS) {
+    if (cancelled()) return null;
+    try {
+      const d = pick(await getJson(url));
+      const lat = Number(d?.latitude);
+      const lon = Number(d?.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) return { name: d.city || d.region || 'My location', lat, lon };
+    } catch {
+      /* try the next service */
+    }
+  }
+  return null;
+}
+
 export class LiveWeather {
   constructor(store) {
     this.store = store;
@@ -87,13 +112,17 @@ export class LiveWeather {
     store.subscribe((path) => {
       // the automatic cycle and the real clock cannot both drive the time
       if (path === 'time.autoCycle' && store.get('time.autoCycle')) store.set('live.enabled', false);
+      // a replaced configuration (import, reset) is brought up to date again
+      if (path === '*') this.key = null;
       if (path === '*' || path.startsWith('live.')) this.sync();
     });
     this.sync();
   }
 
+  /** Follows a place chosen by hand. */
   setCity({ name, lat, lon }) {
     const s = this.store;
+    s.set('live.auto', false);
     s.set('live.city', name);
     s.set('live.lat', lat);
     s.set('live.lon', lon);
@@ -102,7 +131,7 @@ export class LiveWeather {
 
   sync() {
     const live = this.store.get('live');
-    const key = live.enabled ? `${live.lat},${live.lon}` : '';
+    const key = live.enabled ? (live.auto ? 'auto' : `${live.lat},${live.lon}`) : '';
     if (key === this.key) return;
     this.key = key;
     clearInterval(this.timer);
@@ -114,9 +143,31 @@ export class LiveWeather {
       return;
     }
     this.store.set('time.autoCycle', false);
-    this.refresh();
+    if (live.auto) {
+      // the visitor's own time zone is known without any request
+      this.offsetSeconds = -new Date().getTimezoneOffset() * 60;
+      this.applyClock();
+      this.locate();
+    } else {
+      this.refresh();
+    }
     this.timer = setInterval(() => this.refresh(), REFRESH_MS);
     this.clock = setInterval(() => this.applyClock(), CLOCK_MS);
+  }
+
+  async locate() {
+    const id = ++this.request;
+    this.setStatus('loading', 'Finding your location...');
+    const place = await locateByIp(() => id !== this.request);
+    if (id !== this.request) return;
+    if (place) {
+      const s = this.store;
+      s.set('live.city', place.name);
+      s.set('live.lat', place.lat);
+      s.set('live.lon', place.lon);
+    }
+    // without a result the last known place is used
+    this.refresh();
   }
 
   async refresh() {
@@ -134,7 +185,8 @@ export class LiveWeather {
       s.set('weather.type', m.type);
       s.set('weather.intensity', m.intensity);
       s.set('weather.windStrength', m.wind);
-      this.offsetSeconds = data.utc_offset_seconds;
+      // an automatic location keeps the browser's time zone: an IP lookup can be far off
+      if (!this.store.get('live.auto')) this.offsetSeconds = data.utc_offset_seconds;
       this.applyClock();
       const t = data.current;
       this.setStatus('ok', `${city}  ${Math.round(t.temperature_2m)}°C  ${m.label}  wind ${Math.round(t.wind_speed_10m)} km/h`);
