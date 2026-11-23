@@ -332,7 +332,7 @@ export function buildRoom() {
   // --- service counter -------------------------------------------------------------------
   const cx0 = -2.02; // customer face
   const cx1 = -1.4;
-  const cz0 = 2.6;
+  const cz0 = 1.22; // the counter and its return wall the bar in; staff come and go at the far end
   const cz1 = 5.7;
   const CH = 0.98;
   box(cx1 - cx0 - 0.03, CH - 0.1, cz1 - cz0 - 0.03, M.walnut, (cx0 + cx1) / 2, 0.1 + (CH - 0.1) / 2, (cz0 + cz1) / 2);
@@ -347,6 +347,16 @@ export function buildRoom() {
   box(cx1 - cx0 + 0.01, 0.03, 0.012, M.brass, (cx0 + cx1) / 2, 0.115, cz0 - 0.002);
   slab(cx1 - cx0 + 0.1, 0.04, cz1 - cz0 + 0.08, M.marble, (cx0 + cx1) / 2 - 0.02, CH + 0.02, (cz0 + cz1) / 2 - 0.02);
   const CT = CH + 0.04;
+  // return closing the north end of the working aisle, up to the back bar
+  const rx1 = -0.66;
+  const rd = 0.42;
+  box(rx1 - cx1, CH - 0.1, rd - 0.03, M.walnut, (cx1 + rx1) / 2, 0.1 + (CH - 0.1) / 2, cz0 + rd / 2);
+  box(rx1 - cx1, 0.1, rd - 0.12, M.black, (cx1 + rx1) / 2, 0.05, cz0 + rd / 2);
+  const fluteReturn = add(new Mesh(flutedGeometry(rx1 - cx1, CH - 0.14), M.walnut));
+  fluteReturn.position.set(rx1, 0.1, cz0 + 0.016);
+  fluteReturn.rotation.y = Math.PI;
+  box(rx1 - cx1, 0.03, 0.012, M.brass, (cx1 + rx1) / 2, 0.115, cz0 - 0.002);
+  slab(rx1 - cx1 + 0.06, 0.04, rd + 0.06, M.marble, (cx1 + rx1) / 2, CH + 0.02, cz0 + rd / 2 - 0.01);
   // brass foot rail
   stick(v(cx0 - 0.13, 0.17, cz0 + 0.1), v(cx0 - 0.13, 0.17, cz1 - 0.1), 0.014, M.brass);
   for (const z of [cz0 + 0.25, (cz0 + cz1) / 2, cz1 - 0.25]) {
@@ -359,6 +369,12 @@ export function buildRoom() {
   // pastry case
   const pz = 3.86;
   const px = (cx0 + cx1) / 2 - 0.02;
+  // water for the tables: a carafe and tumblers on a tray
+  rbox(0.3, 0.012, 0.42, 0.006, M.walnut, px, CT + 0.006, 1.9);
+  lathe([[0, 0], [0.045, 0], [0.052, 0.02], [0.05, 0.13], [0.026, 0.19], [0.024, 0.24], [0.03, 0.25], [0.027, 0.25], [0.021, 0.24], [0.023, 0.19], [0.046, 0.13], [0.048, 0.022], [0, 0.012]], M.glass, px, CT + 0.012, 1.78).castShadow = false;
+  for (let k = 0; k < 5; k++) {
+    lathe([[0, 0], [0.03, 0], [0.034, 0.09], [0.031, 0.09], [0.028, 0.008], [0, 0.008]], M.glass, px + (k % 2 ? 0.07 : -0.06), CT + 0.012, 1.9 + Math.floor(k / 2) * 0.08 + (k % 2) * 0.03, group, 20).castShadow = false;
+  }
   box(0.46, 0.03, 0.64, M.walnut, px, CT + 0.015, pz);
   const caseGlass = box(0.44, 0.3, 0.62, M.glass, px, CT + 0.18, pz);
   caseGlass.castShadow = false;

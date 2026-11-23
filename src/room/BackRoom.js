@@ -1,4 +1,4 @@
-import { BoxGeometry, Group, IcosahedronGeometry, Mesh, MeshStandardMaterial, PlaneGeometry, RepeatWrapping, TorusGeometry } from 'three';
+import { BoxGeometry, DoubleSide, Group, IcosahedronGeometry, Mesh, MeshStandardMaterial, PlaneGeometry, RepeatWrapping, TorusGeometry } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Rng } from '../core/utils.js';
 import { ROOM } from '../core/layout.js';
@@ -434,7 +434,7 @@ export function buildBack(K) {
     group.add(face);
   }
   // the menu chalked up on the wall behind the counter
-  const board = against((doorX + doorHalf) / 2, D, SOUTH);
+  const board = against(-1.02, D, SOUTH);
   box(1.54, 1.04, 0.03, M.oak, 0, 1.78, 0.015, board);
   const menu = new Mesh(new PlaneGeometry(1.46, 0.96), new MeshStandardMaterial({
     map: chalkboardTexture(['COFFEE', 'espresso  3.0', 'flat white  4.5', 'latte  4.8', 'pour over  5.5', 'TEA & BAKES', 'earl grey  4.0', 'croissant  3.5', 'lemon cake  4.2'], '#252b28', '#ece6d6'), roughness: 0.95,
@@ -444,8 +444,44 @@ export function buildBack(K) {
   board.add(menu);
   slab(1.5, 0.02, 0.05, M.oak, 0, 1.25, 0.04, board);
 
+  // --- staff way in: a doorway between the counter and the wall, hung with a split curtain ----
+  const gx = cx0 + 0.05;
+  const gz0 = cz1 + 0.07;
+  const gz1 = cz1 + 0.95;
+  for (const z of [gz0, gz1]) box(0.07, 2.12, 0.07, M.oak, gx, 1.06, z);
+  box(0.09, 0.09, gz1 - gz0 + 0.11, M.oak, gx, 2.165, (gz0 + gz1) / 2);
+  box(0.04, 2.21, D - gz1 - 0.035, M.oak, gx, 1.105, (gz1 + 0.035 + D) / 2);
+  stick(v(gx, 2.06, gz0), v(gx, 2.06, gz1), 0.008, M.brass);
+  const cloth = linenTexture([66, 86, 100]);
+  cloth.wrapS = cloth.wrapT = RepeatWrapping;
+  cloth.repeat.set(2, 5);
+  const curtainCloth = new MeshStandardMaterial({ map: cloth, roughness: 1, side: DoubleSide });
+  const pw = (gz1 - gz0 - 0.07) / 2 - 0.006;
+  const drop = 1.34;
+  for (const s of [-1, 1]) {
+    const geo = new PlaneGeometry(pw, drop, 22, 8);
+    const p = geo.getAttribute('position');
+    for (let i = 0; i < p.count; i++) {
+      // hangs flat from the rod and ripples more towards the hem
+      const low = 0.5 - p.getY(i) / drop;
+      p.setZ(i, Math.sin(p.getX(i) * 26 + s * 1.7) * 0.014 * (0.25 + low) + s * 0.012 * low);
+    }
+    geo.computeVertexNormals();
+    const panel = new Mesh(geo, curtainCloth);
+    panel.position.set(gx, 2.05 - drop / 2, (gz0 + gz1) / 2 + s * (pw / 2 + 0.004));
+    panel.rotation.y = Math.PI / 2;
+    panel.castShadow = true;
+    panel.receiveShadow = true;
+    group.add(panel);
+    box(0.012, 0.03, pw, mat(0xd8cdb6, 0.95), gx, 2.05 - drop + 0.12, (gz0 + gz1) / 2 + s * (pw / 2 + 0.004)).castShadow = false;
+  }
+  const staffOnly = lettered('STAFF ONLY', 0.36, 0.08, '#efe6d2', '#3a2c20');
+  staffOnly.position.set(gx - 0.046, 2.165, (gz0 + gz1) / 2);
+  staffOnly.rotation.y = -Math.PI / 2;
+  group.add(staffOnly);
+
   // --- greenery -------------------------------------------------------------------------
-  for (const [seed, scale, x, z] of [[11, 3.1, -7.7, 0.72], [19, 2.3, -8.02, 6.5], [23, 1.9, doorX + doorHalf + 0.36, 6.62]]) {
+  for (const [seed, scale, x, z] of [[11, 3.1, -7.7, 0.72], [19, 2.3, -8.02, 6.5], [23, 1.5, doorX + doorHalf + 0.2, 6.76]]) {
     const plant = leafyPlant(seed, 0.058, 0.1);
     plant.scale.setScalar(scale);
     plant.position.set(x, 0, z);
