@@ -21,7 +21,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildRoom } from '../room/RoomBuilder.js';
 import { WindowGlass } from '../room/WindowGlass.js';
 import { SkyDome } from '../sky/SkyDome.js';
-import { LightingSystem } from '../systems/LightingSystem.js';
+import { LightingSystem, lateness } from '../systems/LightingSystem.js';
 import { TimeSystem } from '../systems/TimeSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
 import { LightningSystem } from '../weather/LightningSystem.js';
@@ -378,6 +378,7 @@ export class App {
 
     this.traffic.setEnabled(state.scene.trafficEnabled);
     this.traffic.setDensity(state.scene.trafficDensity / 100);
+    this.closeForNight(state);
     this.lighting.update(dt, simDt, this.time.env, this.weather, this.lightning, state);
     this.interiorScene.environmentIntensity = 0.015 + this.room.lights.fill.intensity * 0.6;
     this.traffic.update(simDt);
@@ -428,6 +429,34 @@ export class App {
   }
 
   /** Skips all running transitions (time easing, weather build-up). Used for testing and captures. */
+  /**
+   * The cafe switches its own lights off at closing time and back on in the morning. The
+   * switches in the panel follow, so anything turned on by hand during the night stays on.
+   */
+  closeForNight(state) {
+    const closed = lateness(this.time.env.hour) > 0.5;
+    if (closed === this.closed) return;
+    this.closed = closed;
+    const s = state.scene;
+    if (closed) {
+      this.beforeClosing = {
+        interiorLightEnabled: s.interiorLightEnabled,
+        deskLampEnabled: s.deskLampEnabled,
+        computerScreenBrightness: s.computerScreenBrightness,
+      };
+      this.store.set('scene.interiorLightEnabled', false);
+      this.store.set('scene.deskLampEnabled', false);
+      this.store.set('scene.computerScreenBrightness', 0);
+    } else {
+      // nothing remembered (page loaded during the night): open with everything on
+      const was = this.beforeClosing ?? { interiorLightEnabled: true, deskLampEnabled: true, computerScreenBrightness: 80 };
+      if (!s.interiorLightEnabled) this.store.set('scene.interiorLightEnabled', was.interiorLightEnabled);
+      if (!s.deskLampEnabled) this.store.set('scene.deskLampEnabled', was.deskLampEnabled);
+      if (s.computerScreenBrightness === 0) this.store.set('scene.computerScreenBrightness', was.computerScreenBrightness);
+      this.beforeClosing = null;
+    }
+  }
+
   settle() {
     this.time.hour = this.store.state.time.hour % 24;
     Object.assign(this.weather.params, this.weather.resolve());

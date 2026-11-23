@@ -36,6 +36,11 @@ const desaturate = (c, amount) => {
   return c;
 };
 
+/** 0 in the day and evening, 1 in the small hours when the town has gone to sleep. */
+export function lateness(hour) {
+  return hour < 12 ? 1 - smoothstep(5.2, 6.2, hour) : smoothstep(23.0, 23.9, hour);
+}
+
 export class LightingSystem {
   constructor({ exteriorScene, sky, city, furniture, room, glass, traffic, rain, snow, cameraPosition }) {
     this.sky = sky;
@@ -100,7 +105,7 @@ export class LightingSystem {
     // After midnight the town sleeps: the cafe is shut and dark, shops, signs and nearly all
     // windows are off. Only the streetlights and the traffic keep burning until dawn.
     const hour = env.hour;
-    const late = hour < 12 ? 1 - smoothstep(5.2, 6.2, hour) : smoothstep(23.0, 23.9, hour);
+    const late = lateness(hour);
     this.late = late;
     ext.uLate.value = late;
     const precip = smoothstep(0.08, 0.4, wx.rain + wx.snow + wx.fog * 40);
@@ -212,10 +217,9 @@ export class LightingSystem {
     const scene = state.scene;
     const lv = this.levels;
     const k = this.first ? 1000 : 6;
-    const open = 1 - late;
-    lv.interior = damp(lv.interior, scene.interiorLightEnabled ? open : 0, k, realDt);
-    lv.lamp = damp(lv.lamp, scene.deskLampEnabled ? open : 0, k, realDt);
-    lv.screen = damp(lv.screen, (scene.computerScreenBrightness / 100) * open, k, realDt);
+    lv.interior = damp(lv.interior, scene.interiorLightEnabled ? 1 : 0, k, realDt);
+    lv.lamp = damp(lv.lamp, scene.deskLampEnabled ? 1 : 0, k, realDt);
+    lv.screen = damp(lv.screen, scene.computerScreenBrightness / 100, k, realDt);
     const L = this.room.lights;
 
     L.sun.color.copy(this.sun.color);
