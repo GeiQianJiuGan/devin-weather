@@ -238,6 +238,7 @@ export class LightingSystem {
     L.pendants.intensity = 2.0 * lv.interior;
     this.room.fixtureMaterial.color.copy(WARM).multiplyScalar(0.04 + 9 * lv.interior);
     this.room.globeMaterial.color.copy(WARM).multiplyScalar(0.12 + 0.2 * clamp(lum, 0, 1) + 2.2 * lv.interior);
+    this.room.shadeInnerMaterial.emissiveIntensity = 1.5 * lv.interior;
     this.room.domeInnerMaterial.color.copy(WARM).multiplyScalar(0.03 + 1.6 * lv.interior);
     L.lamp.intensity = 1.5 * lv.lamp;
     this.room.bulbMaterial.color.copy(LAMP_WARM).multiplyScalar(0.03 + 30 * lv.lamp);

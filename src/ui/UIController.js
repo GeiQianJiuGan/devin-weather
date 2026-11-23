@@ -192,7 +192,7 @@ export class UIController {
     config.addEventListener('toggle', () => this.schedule());
     this.configDetails = config;
 
-    const hint = el('p', { class: 'hint', text: 'Space: pause   H: hide panel   F: fullscreen' });
+    const hint = el('p', { class: 'hint', text: 'Drag: look around   WASD / arrows: walk   Q/E: down/up   Wheel: zoom   R or double-click: reset view   Space: pause   H: hide panel   F: fullscreen' });
     this.panel.append(head, weather, time, scene, playback, config, hint);
   }
 

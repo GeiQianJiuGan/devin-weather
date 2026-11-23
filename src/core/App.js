@@ -26,7 +26,9 @@ import { TimeSystem } from '../systems/TimeSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
 import { LightningSystem } from '../weather/LightningSystem.js';
 import { RainSystem, SnowSystem } from '../weather/Precipitation.js';
-import { CAMERA, ROOM_ORIGIN } from './layout.js';
+import { CAMERA, ROOM, ROOM_ORIGIN } from './layout.js';
+
+const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 import { QUALITY } from './PerformanceManager.js';
 import { Rng, clamp, damp, formatHour } from './utils.js';
 
@@ -68,6 +70,10 @@ export class App {
     this.camera = new PerspectiveCamera(CAMERA.fov, BASE_ASPECT, 0.05, 60);
     this.exteriorCamera = new PerspectiveCamera(CAMERA.fov, BASE_ASPECT, 0.5, 6000);
     this.pointer = { x: 0, y: 0, sx: 0, sy: 0 };
+    this.view = { position: new Vector3(), yaw: 0, pitch: 0, zoom: 1, moved: false };
+    this.keys = new Set();
+    this.drag = null;
+    this.resetView();
     this.placeCameras();
 
     // --- city (exterior scene) -----------------------------------------------------------
@@ -130,6 +136,19 @@ export class App {
     this.onPointer = this.onPointer.bind(this);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('pointermove', this.onPointer);
+    this.onPointerDown = this.onPointerDown.bind(this);
+    this.onPointerUp = this.onPointerUp.bind(this);
+    this.onWheel = this.onWheel.bind(this);
+    this.onKey = this.onKey.bind(this);
+    this.onBlur = () => this.keys.clear();
+    canvas.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('pointercancel', this.onPointerUp);
+    canvas.addEventListener('wheel', this.onWheel, { passive: false });
+    canvas.addEventListener('dblclick', () => this.resetView());
+    window.addEventListener('keydown', this.onKey);
+    window.addEventListener('keyup', this.onKey);
+    window.addEventListener('blur', this.onBlur);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(stage);
     canvas.addEventListener('webglcontextlost', (e) => {
@@ -145,22 +164,113 @@ export class App {
 
   placeCameras() {
     const p = this.pointer;
-    // a few centimetres of parallax following the pointer makes the depth readable
-    const eye = this.camera.position.copy(this.cameraHome);
-    eye.x += p.sx * 0.05 * 0.68 ;
-    eye.z += p.sx * 0.05 * 0.73;
-    eye.y += p.sy * 0.03;
-    this.camera.lookAt(CAMERA.target);
+    const v = this.view;
+    const eye = this.camera.position.copy(v.position);
+    if (!v.moved) {
+      // a few centimetres of parallax following the pointer makes the depth readable
+      eye.x += p.sx * 0.05 * 0.68;
+      eye.z += p.sx * 0.05 * 0.73;
+      eye.y += p.sy * 0.03;
+    }
+    this.camera.rotation.set(v.pitch, v.yaw, 0, 'YXZ');
     this.exteriorCamera.position.copy(eye);
     this.exteriorCamera.quaternion.copy(this.camera.quaternion);
     this.camera.updateMatrixWorld();
     this.exteriorCamera.updateMatrixWorld();
   }
 
+  /** Back to the framing the scene was composed for. */
+  resetView() {
+    const v = this.view;
+    v.position.copy(this.cameraHome);
+    const d = new Vector3().subVectors(CAMERA.target, this.cameraHome).normalize();
+    v.yaw = Math.atan2(-d.x, -d.z);
+    v.pitch = Math.asin(d.y);
+    v.moved = false;
+    if (v.zoom !== 1) {
+      v.zoom = 1;
+      this.sizedFor = null;
+      if (this.quality) this.resize();
+    }
+  }
+
+  /** Free look: walk with WASD/arrows (Q/E down/up), kept inside the cafe walls. */
+  moveView(dt) {
+    const k = this.keys;
+    const f = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    const r = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const u = (k.has('KeyE') ? 1 : 0) - (k.has('KeyQ') ? 1 : 0);
+    if (!f && !r && !u) return;
+    const v = this.view;
+    const step = (k.has('ShiftLeft') || k.has('ShiftRight') ? 3.2 : 1.4) * Math.min(dt, 0.1);
+    const sin = Math.sin(v.yaw);
+    const cos = Math.cos(v.yaw);
+    v.position.x += (-sin * f + cos * r) * step;
+    v.position.z += (-cos * f - sin * r) * step;
+    v.position.y += u * step;
+    v.moved = true;
+    this.clampView();
+  }
+
+  clampView() {
+    const pos = this.view.position;
+    const m = 0.22;
+    pos.x = clamp(pos.x, ROOM_ORIGIN.x - ROOM.w + m, ROOM_ORIGIN.x - m);
+    pos.z = clamp(pos.z, ROOM_ORIGIN.z + m, ROOM_ORIGIN.z + ROOM.d - m);
+    pos.y = clamp(pos.y, ROOM_ORIGIN.y + 0.35, ROOM_ORIGIN.y + ROOM.h - 0.3);
+  }
+
   onPointer(e) {
     const rect = this.stage.getBoundingClientRect();
     this.pointer.x = clamp(((e.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1, -1, 1);
     this.pointer.y = clamp(1 - ((e.clientY - rect.top) / Math.max(rect.height, 1)) * 2, -1, 1);
+    const d = this.drag;
+    if (d && d.id === e.pointerId) {
+      // the scene follows the hand: dragging right turns the view left
+      const k = ((this.camera.fov * Math.PI) / 180) / Math.max(rect.height, 1);
+      const v = this.view;
+      v.yaw += (e.clientX - d.x) * k;
+      v.pitch = clamp(v.pitch + (e.clientY - d.y) * k, -1.25, 1.25);
+      v.moved = true;
+      d.x = e.clientX;
+      d.y = e.clientY;
+    }
+  }
+
+  onPointerDown(e) {
+    if (e.button !== 0) return;
+    this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    this.canvas.setPointerCapture?.(e.pointerId);
+    this.canvas.classList.add('dragging');
+  }
+
+  onPointerUp(e) {
+    if (!this.drag || this.drag.id !== e.pointerId) return;
+    this.drag = null;
+    this.canvas.classList.remove('dragging');
+  }
+
+  onWheel(e) {
+    e.preventDefault();
+    const v = this.view;
+    v.zoom = clamp(v.zoom * Math.exp(e.deltaY * 0.0012), 0.35, 1.5);
+    v.moved = true;
+    this.sizedFor = null;
+    this.resize();
+  }
+
+  onKey(e) {
+    if (e.type === 'keyup') {
+      this.keys.delete(e.code);
+      return;
+    }
+    const tag = e.target.tagName;
+    if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === 'KeyR') this.resetView();
+    else if (MOVE_KEYS.has(e.code)) {
+      this.keys.add(e.code);
+      if (e.code.startsWith('Arrow')) e.preventDefault();
+    }
   }
 
   applyQuality() {
@@ -194,6 +304,7 @@ export class App {
     const half = (CAMERA.fov * Math.PI) / 360;
     let fov = CAMERA.fov;
     if (aspect < BASE_ASPECT) fov = Math.min(86, (Math.atan((Math.tan(half) * BASE_ASPECT) / aspect) * 360) / Math.PI);
+    fov = (Math.atan(Math.tan((fov * Math.PI) / 360) * this.view.zoom) * 360) / Math.PI;
     for (const cam of [this.camera, this.exteriorCamera]) {
       cam.fov = fov;
       cam.aspect = aspect;
@@ -271,6 +382,7 @@ export class App {
     const p = this.pointer;
     p.sx = damp(p.sx, p.x, 3, dt);
     p.sy = damp(p.sy, p.y, 3, dt);
+    this.moveView(dt);
     this.placeCameras();
   }
 
@@ -316,6 +428,11 @@ export class App {
     this.stop();
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('pointermove', this.onPointer);
+    window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('pointercancel', this.onPointerUp);
+    window.removeEventListener('keydown', this.onKey);
+    window.removeEventListener('keyup', this.onKey);
+    window.removeEventListener('blur', this.onBlur);
     this.resizeObserver.disconnect();
     this.exterior.dispose();
     this.post.dispose();

@@ -257,28 +257,40 @@ export function buildRoom() {
     group.add(g);
     const seatY = 0.44;
     lathe(seatProfile, M.oak, 0, seatY, 0, g);
+    // splayed legs; every stretcher ends on a leg axis so nothing hangs in the air
+    const leg = (sx, sz, y) => {
+      const t = y / seatY;
+      return v(sx * (0.2 - 0.06 * t), y, sz * (0.2 - 0.06 * t));
+    };
     for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        stick(v(sx * 0.2, 0, sz * 0.2), v(sx * 0.14, seatY + 0.004, sz * 0.14), 0.013, M.oak, g, 0.019);
-      }
-      stick(v(sx * 0.177, 0.2, -0.177), v(sx * 0.177, 0.2, 0.177), 0.008, M.oak, g);
+      for (const sz of [-1, 1]) stick(leg(sx, sz, 0), leg(sx, sz, seatY + 0.006), 0.013, M.oak, g, 0.019);
+      stick(leg(sx, -1, 0.2), leg(sx, 1, 0.2), 0.008, M.oak, g);
     }
-    stick(v(-0.177, 0.24, 0), v(0.177, 0.24, 0), 0.008, M.oak, g);
-    // back rail: a horizontal arc behind the sitter (the chair faces +Z)
-    const railR = 0.215;
+    const side = leg(1, 0, 0.2).x;
+    stick(v(-side, 0.2, 0), v(side, 0.2, 0), 0.008, M.oak, g);
+    stick(leg(-1, 1, 0.3), leg(1, 1, 0.3), 0.008, M.oak, g);
+    // back rail: a horizontal arc behind the sitter (the chair faces +Z), carried by spindles
+    // that are let into the seat; the two end posts are stouter and meet the rail tips
+    const railR = 0.2;
     const railY = seatY + 0.34;
+    const N = 12;
     const pts = [];
-    for (let k = 0; k <= 12; k++) {
-      const a = Math.PI * (1.08 + (0.84 * k) / 12);
-      const drop = 0.06 * Math.pow(Math.abs(k - 6) / 6, 2.4);
-      pts.push([Math.cos(a) * railR, railY - drop, Math.sin(a) * railR - 0.03]);
+    for (let k = 0; k <= N; k++) {
+      const a = Math.PI * (1.06 + (0.88 * k) / N);
+      const drop = 0.06 * Math.pow(Math.abs(k - N / 2) / (N / 2), 2.4);
+      pts.push([Math.cos(a) * railR, railY - drop, Math.sin(a) * railR - 0.02]);
     }
     tube(pts, 0.014, M.oak, g);
-    for (let k = 1; k <= 11; k += 2) {
-      const a = Math.PI * (1.08 + (0.84 * k) / 12);
+    for (const end of [pts[0], pts[N]]) {
+      const cap = add(new Mesh(new SphereGeometry(0.014, 12, 8), M.oak), true, true, g);
+      cap.position.set(...end);
+    }
+    for (let k = 0; k <= N; k += 2) {
+      const a = Math.PI * (1.06 + (0.88 * k) / N);
+      const ends = k === 0 || k === N;
       stick(
-        v(Math.cos(a) * 0.185, seatY + 0.02, Math.sin(a) * 0.185),
-        v(pts[k][0], pts[k][1], pts[k][2]), 0.0075, M.oak, g,
+        v(Math.cos(a) * 0.172, seatY + 0.012, Math.sin(a) * 0.172 - 0.01),
+        v(pts[k][0], pts[k][1], pts[k][2]), ends ? 0.0115 : 0.0075, M.oak, g, ends ? 0.01 : 0.0065,
       );
     }
     return g;
@@ -293,7 +305,7 @@ export function buildRoom() {
       const a = Math.PI / 4 + (k * Math.PI) / 2;
       stick(v(Math.cos(a) * 0.2, 0, Math.sin(a) * 0.2), v(Math.cos(a) * 0.11, 0.69, Math.sin(a) * 0.11), 0.011, M.iron, g);
     }
-    const ring = add(new Mesh(new TorusGeometry(0.173, 0.008, 10, 40), M.brass), true, true, g);
+    const ring = add(new Mesh(new TorusGeometry(0.166, 0.008, 10, 40), M.brass), true, true, g);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.26;
     return g;
@@ -625,15 +637,47 @@ export function buildRoom() {
     group.add(b);
   };
   for (const z of [3.0, 3.75, 4.5]) pendantDome((cx0 + cx1) / 2, 2.12, z);
-  const pendantGlobe = (x, y, z) => {
-    stick(v(x, y + 0.1, z), v(x, H, z), 0.0035, M.black).castShadow = false;
-    cyl(0.04, 0.04, 0.018, M.brass, x, H - 0.009, z, group, 24);
-    cyl(0.022, 0.03, 0.05, M.brass, x, y + 0.115, z, group, 16);
-    const globe = new Mesh(new SphereGeometry(0.105, 32, 24), globeMaterial);
-    globe.position.set(x, y, z);
-    group.add(globe);
+  // Over the window tables: enamelled spun-metal shades on a twisted cord, each with a brass
+  // lamp holder, a vented neck and a frosted bulb that sits just above the rim.
+  const pendantShadeProfile = [
+    [0.021, 0.2], [0.03, 0.198], [0.036, 0.186], [0.04, 0.166], [0.056, 0.14], [0.086, 0.104],
+    [0.118, 0.062], [0.14, 0.024], [0.147, 0.006], [0.15, 0], [0.147, -0.004],
+  ];
+  const pendantShadeGeo = new LatheGeometry(pendantShadeProfile.map(([r, h]) => new Vector2(r, h)), 56);
+  // the profile runs top-down, so the lathe's front faces look inwards
+  const pendantShadeOuter = new MeshStandardMaterial({ color: 0x39453c, roughness: 0.34, metalness: 0.25, side: BackSide });
+  const pendantShadeInner = new MeshStandardMaterial({
+    color: 0xe9e3d4, roughness: 0.6, emissive: 0xffd9a8, emissiveIntensity: 0,
+  });
+  const pendantBulbProfile = [[0, -0.048], [0.014, -0.045], [0.024, -0.036], [0.03, -0.02], [0.03, -0.006], [0.024, 0.014], [0.015, 0.03], [0.013, 0.05]];
+  const pendantBulbGeo = new LatheGeometry(pendantBulbProfile.map(([r, h]) => new Vector2(r, h)), 24);
+  const pendantShade = (x, y, z, sway) => {
+    const g = new Group();
+    g.position.set(x, y, z);
+    g.rotation.set(sway * 0.02, sway, -sway * 0.015);
+    group.add(g);
+    // ceiling rose and cord with a strain-relief grip
+    cyl(0.045, 0.05, 0.022, M.brass, x, H - 0.011, z, group, 28);
+    cyl(0.012, 0.016, 0.03, M.brass, x, H - 0.036, z, group, 16);
+    stick(v(x, y + 0.26, z), v(x, H - 0.03, z), 0.0032, M.black).castShadow = false;
+    cyl(0.008, 0.011, 0.03, M.black, 0, 0.262, 0, g, 12);
+    // lamp holder: knurled brass cup with two collars
+    cyl(0.019, 0.021, 0.05, M.brass, 0, 0.222, 0, g, 24);
+    cyl(0.024, 0.024, 0.006, M.brass, 0, 0.236, 0, g, 24);
+    cyl(0.026, 0.026, 0.007, M.brass, 0, 0.2, 0, g, 24);
+    add(new Mesh(pendantShadeGeo, pendantShadeOuter), false, false, g);
+    const inner = new Mesh(pendantShadeGeo, pendantShadeInner);
+    inner.scale.set(0.985, 0.985, 0.985);
+    g.add(inner);
+    const rim = add(new Mesh(new TorusGeometry(0.149, 0.0035, 8, 56), M.brass), false, false, g);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.001;
+    cyl(0.014, 0.014, 0.03, M.brass, 0, 0.18, 0, g, 16);
+    const bulb = new Mesh(pendantBulbGeo, globeMaterial);
+    bulb.position.y = 0.115;
+    g.add(bulb);
   };
-  windowTables.forEach((x, i) => pendantGlobe(x, 2.52 - (i % 2) * 0.1, 0.82));
+  windowTables.forEach((x, i) => pendantShade(x, 2.2 - (i % 2) * 0.12, 0.82, (i - 1) * 0.9));
 
   // fake contact shadows (area and point lights cast no shadows of their own)
   const shadowTex = contactShadowTexture();
@@ -726,6 +770,7 @@ export function buildRoom() {
     fixtureMaterial,
     globeMaterial,
     domeInnerMaterial: domeInner,
+    shadeInnerMaterial: pendantShadeInner,
     anchors: {
       screen: screenCenter,
       lamp: bulb.getWorldPosition(new Vector3()),
