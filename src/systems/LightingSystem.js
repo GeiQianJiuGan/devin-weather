@@ -13,7 +13,6 @@ const MOON_COLOR = new Color(0.55, 0.68, 1.0);
 const FLASH_COLOR = new Color(0.72, 0.8, 1.0);
 const CITY_GLOW = new Color(0.022, 0.016, 0.012);
 const WARM = new Color(1.0, 0.78, 0.56);
-const LAMP_WARM = new Color(1.0, 0.72, 0.42);
 const SCREEN_COOL = new Color(1.0, 0.9, 0.76);
 
 const _a = new Color();
@@ -76,7 +75,7 @@ export class LightingSystem {
       .sort((p, q) => p.d - q.d)
       .slice(0, 8);
 
-    this.levels = { interior: 0, lamp: 0, screen: 0.8 };
+    this.levels = { interior: 0, screen: 0.8 };
     this.exposure = 1;
     this.scatter = 0.5;
     this.haloThreshold = 1;
@@ -218,7 +217,6 @@ export class LightingSystem {
     const lv = this.levels;
     const k = this.first ? 1000 : 6;
     lv.interior = damp(lv.interior, scene.interiorLightEnabled ? 1 : 0, k, realDt);
-    lv.lamp = damp(lv.lamp, scene.deskLampEnabled ? 1 : 0, k, realDt);
     lv.screen = damp(lv.screen, scene.computerScreenBrightness / 100, k, realDt);
     const L = this.room.lights;
 
@@ -245,16 +243,13 @@ export class LightingSystem {
     L.windowEastPoint.intensity = L.windowAreaEast * 2.2;
 
     L.fill.color.copy(WARM).lerp(_d.copy(ambient).multiplyScalar(1 / Math.max(luminance(ambient), 1e-3)), 0.5 * clamp(lum, 0, 1));
-    L.fill.intensity = lerp(0.03, 0.008, late) + 0.22 * clamp(lum, 0, 1) + 0.1 * lv.interior + 0.03 * lv.lamp + flash * 0.12;
+    L.fill.intensity = lerp(0.03, 0.008, late) + 0.22 * clamp(lum, 0, 1) + 0.1 * lv.interior + flash * 0.12;
     L.ceiling.intensity = 2.4 * lv.interior;
     L.pendants.intensity = 2.0 * lv.interior;
     this.room.fixtureMaterial.color.copy(WARM).multiplyScalar(0.04 + 9 * lv.interior);
     this.room.globeMaterial.color.copy(WARM).multiplyScalar(0.12 + 0.2 * clamp(lum, 0, 1) + 2.2 * lv.interior);
     this.room.shadeInnerMaterial.emissiveIntensity = 1.5 * lv.interior;
     this.room.domeInnerMaterial.color.copy(WARM).multiplyScalar(0.03 + 1.6 * lv.interior);
-    L.lamp.intensity = 1.5 * lv.lamp;
-    this.room.bulbMaterial.color.copy(LAMP_WARM).multiplyScalar(0.03 + 30 * lv.lamp);
-    this.room.lampGlowMaterial.color.copy(LAMP_WARM).multiplyScalar(0.02 + 3.5 * lv.lamp);
 
     // monitor: dims itself a little in a dark room, but is always a cool light source
     const screenPower = lv.screen * lerp(0.72, 1, clamp(lum, 0, 1));
@@ -277,18 +272,16 @@ export class LightingSystem {
     gu.uHalo.value = this.haloActive ? 0.03 + 0.04 * cityLights + 0.2 * g.halo : 0;
     gu.uTilt.value = clamp(weather.wind.speed * 0.014, 0, 0.3);
     mad(mad(gu.uVeil.value.copy(ambient).multiplyScalar(0.3), cityGlow, 0.6), FLASH_COLOR, flash);
-    gu.uInterior.value.copy(WARM).multiplyScalar(0.1 * lv.interior + 0.025 * lv.lamp);
+    gu.uInterior.value.copy(WARM).multiplyScalar(0.1 * lv.interior);
     mad(mad(gu.uInterior.value, SCREEN_COOL, 0.012 * screenPower), ambient, 0.02);
     gu.uGlintPos.value[0].copy(this.room.anchors.screen);
-    gu.uGlintPos.value[1].copy(this.room.anchors.lamp);
     gu.uGlintColor.value[0].copy(SCREEN_COOL).multiplyScalar(2.2 * screenPower);
     gu.uGlintColor.value[0].multiplyScalar(0.5);
-    gu.uGlintColor.value[1].copy(LAMP_WARM).multiplyScalar(8 * lv.lamp * (0.08 + 0.92 * cityLights));
     const pendantAnchors = this.room.anchors.pendants;
     for (let i = 0; i < pendantAnchors.length; i++) {
-      gu.uGlintPos.value[2 + i].copy(pendantAnchors[i]);
+      gu.uGlintPos.value[1 + i].copy(pendantAnchors[i]);
       // against daylight a reflection on the glass is all but invisible
-      gu.uGlintColor.value[2 + i].copy(WARM).multiplyScalar(6 * lv.interior * (0.08 + 0.92 * cityLights));
+      gu.uGlintColor.value[1 + i].copy(WARM).multiplyScalar(6 * lv.interior * (0.08 + 0.92 * cityLights));
     }
 
     this.scatter = lerp(0.4, 0.68, clamp(g.mist + g.blur, 0, 1));
@@ -309,7 +302,6 @@ export class LightingSystem {
     };
     apply(this.sun, q.shadowSize);
     apply(this.room.lights.sun, q.shadowSize);
-    apply(this.room.lights.lamp, q.lampShadowSize);
     this.furniture.lights.forEach((light, i) => (light.visible = i < q.streetLights));
     const L = this.room.lights;
     for (const light of [L.windowNorth, L.windowEast, L.monitorLight]) light.visible = q.areaLights;

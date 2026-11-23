@@ -51,7 +51,6 @@ export function createDefaultState() {
       windowCondensation: true,
       exteriorBlur: 50,
       interiorLightEnabled: true,
-      deskLampEnabled: true,
       computerScreenBrightness: 80,
     },
     // live mode: follow the current weather and local time of a real place
@@ -76,7 +75,6 @@ const SCHEMA = {
   'scene.windowCondensation': bool,
   'scene.exteriorBlur': num(0, 100),
   'scene.interiorLightEnabled': bool,
-  'scene.deskLampEnabled': bool,
   'scene.computerScreenBrightness': num(0, 100),
   'live.enabled': bool,
   'live.auto': bool,

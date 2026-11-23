@@ -2,17 +2,17 @@
 
 export const QUALITY = {
   low: {
-    maxPixelRatio: 1, renderScale: 0.6, msaa: 0, shadows: false, shadowSize: 1024, lampShadowSize: 512, shadowInterval: 1,
+    maxPixelRatio: 1, renderScale: 0.6, msaa: 0, shadows: false, shadowSize: 1024, shadowInterval: 1,
     reflection: false, reflectionScale: 0.3, blurLevels: 3, haloLevels: 3, finalBloom: false,
     particles: 0.3, dropLayers: 1, cheapNormals: true, cloudOctaves: 3, streetLights: 0, areaLights: false,
   },
   medium: {
-    maxPixelRatio: 1, renderScale: 0.8, msaa: 2, shadows: true, shadowSize: 1024, lampShadowSize: 512, shadowInterval: 2,
+    maxPixelRatio: 1, renderScale: 0.8, msaa: 2, shadows: true, shadowSize: 1024, shadowInterval: 2,
     reflection: true, reflectionScale: 0.35, blurLevels: 4, haloLevels: 4, finalBloom: true,
     particles: 0.6, dropLayers: 2, cheapNormals: false, cloudOctaves: 4, streetLights: 4, areaLights: false,
   },
   high: {
-    maxPixelRatio: 1.5, renderScale: 1, msaa: 4, shadows: true, shadowSize: 2048, lampShadowSize: 1024, shadowInterval: 1,
+    maxPixelRatio: 1.5, renderScale: 1, msaa: 4, shadows: true, shadowSize: 2048, shadowInterval: 1,
     reflection: true, reflectionScale: 0.5, blurLevels: 5, haloLevels: 4, finalBloom: true,
     particles: 1, dropLayers: 2, cheapNormals: false, cloudOctaves: 5, streetLights: 8, areaLights: true,
   },

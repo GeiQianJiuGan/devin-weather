@@ -61,31 +61,6 @@ function broadLeafTexture() {
   return t;
 }
 
-function bladeTexture() {
-  const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = '#2b4f2c';
-  g.fillRect(0, 0, 64, 256);
-  const rng = new Rng(47);
-  for (let y = 0; y < 256; y += rng.range(5, 12)) {
-    g.strokeStyle = `rgba(${rng.int(110, 160)},${rng.int(150, 185)},${rng.int(95, 125)},${rng.range(0.3, 0.7)})`;
-    g.lineWidth = rng.range(1.5, 4.5);
-    g.beginPath();
-    g.moveTo(0, y);
-    for (let x = 8; x <= 64; x += 8) g.lineTo(x, y + rng.range(-3, 3));
-    g.stroke();
-  }
-  g.fillStyle = '#b9b65a';
-  g.fillRect(0, 0, 5, 256);
-  g.fillRect(59, 0, 5, 256);
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 16;
-  return t;
-}
-
 /**
  * A leaf blade growing along +Z from the origin, upper side +Y.
  * `outline(u)` gives the half-width fraction at u in [0, 1].
@@ -129,7 +104,6 @@ function leafGeometry({ length, width, fold, droop, twist = 0, outline, nu = 9, 
 }
 
 const OVATE = (u) => Math.sin(Math.PI * u ** 0.62) ** 0.85 * (1 - 0.25 * u) + 0.02;
-const SWORD = (u) => (u < 0.72 ? 0.55 + 0.45 * Math.sin((u / 0.72) * Math.PI * 0.5) : Math.cos(((u - 0.72) / 0.28) * Math.PI * 0.5) ** 0.7) + 0.02;
 
 function potMeshes(r, h, material, soilMat, saucerMat) {
   const rb = r * 0.74;
@@ -157,7 +131,6 @@ let shared;
 function materials() {
   shared ??= {
     broad: new MeshStandardMaterial({ map: broadLeafTexture(), roughness: 0.56, metalness: 0, side: DoubleSide }),
-    blade: new MeshStandardMaterial({ map: bladeTexture(), roughness: 0.5, metalness: 0, side: DoubleSide }),
     stem: new MeshStandardMaterial({ color: 0x55702f, roughness: 0.7 }),
     soil: new MeshStandardMaterial({ color: 0x2a1f17, roughness: 1 }),
     terracotta: new MeshStandardMaterial({ color: 0xa9603f, roughness: 0.88 }),
@@ -211,31 +184,61 @@ export function broadLeafPlant(seed, potR = 0.055, potH = 0.09) {
   return finish(group);
 }
 
-/** An upright snake plant in a glazed ceramic pot. */
-export function snakePlant(seed, potR = 0.05, potH = 0.08) {
+/**
+ * A full, leafy floor plant (ficus like): several canes rising from the pot, each carrying
+ * leaves all the way up, over a skirt of low leaves that hides the soil.
+ */
+export function leafyPlant(seed, potR = 0.05, potH = 0.08) {
   const M = materials();
   const rng = new Rng(seed);
   const group = new Group();
   group.add(...potMeshes(potR, potH, M.ceramic, M.soil, null));
   const soilY = potH * 0.84;
   const leaves = [];
+  const stems = [];
   const dummy = new Object3D();
   dummy.rotation.order = 'YXZ';
-  const N = 11;
-  for (let i = 0; i < N; i++) {
-    const phi = i * 2.39996 + rng.range(-0.3, 0.3);
-    const rad = potR * 0.5 * Math.sqrt(i / N);
-    const length = potR * rng.range(2.2, 4.4) * (1 - 0.3 * (i / N));
+  const addLeaf = (at, phi, pitch, length, droop) => {
     const leaf = leafGeometry({
-      length, width: potR * rng.range(0.24, 0.34), fold: rng.range(0.25, 0.45), droop: rng.range(-0.12, 0.3),
-      twist: rng.range(-0.9, 0.9), outline: SWORD, nu: 10,
+      length, width: length * rng.range(0.3, 0.38), fold: rng.range(0.14, 0.3), droop, outline: OVATE,
     });
-    dummy.position.set(Math.cos(phi) * rad, soilY, Math.sin(phi) * rad);
-    dummy.rotation.set(-Math.PI / 2 + rng.range(0.04, 0.2) + 0.25 * (i / N), Math.PI / 2 - phi, rng.range(-0.5, 0.5));
+    dummy.position.copy(at);
+    dummy.rotation.set(pitch, Math.PI / 2 - phi, rng.range(-0.35, 0.35));
     dummy.updateMatrix();
     leaf.applyMatrix4(dummy.matrix);
     leaves.push(leaf);
+  };
+  const CANES = 11;
+  for (let c = 0; c < CANES; c++) {
+    const phi = c * 2.39996 + rng.range(-0.3, 0.3);
+    // the first cane is the leader, the others lean outwards around it
+    const lean = c === 0 ? 0.15 : rng.range(0.55, 1.25);
+    const height = potR * (c === 0 ? 7.6 : rng.range(4.2, 6.6));
+    const base = new Vector3(Math.cos(phi) * potR * 0.3, soilY, Math.sin(phi) * potR * 0.3);
+    const tip = new Vector3(Math.cos(phi) * potR * lean * 2.2, soilY + height, Math.sin(phi) * potR * lean * 2.2);
+    const ctrl = new Vector3(base.x * 1.3, soilY + height * 0.6, base.z * 1.3);
+    const cane = new QuadraticBezierCurve3(base, ctrl, tip);
+    stems.push(new TubeGeometry(cane, 10, potR * 0.05, 6));
+    const n = Math.round(height / potR / 0.4);
+    for (let i = 0; i < n; i++) {
+      const t = 0.22 + 0.78 * (i / (n - 1));
+      const at = cane.getPoint(t);
+      // leaves spiral around the cane; the top ones stand up, the lower ones hang out
+      const lphi = phi + i * 2.39996 + rng.range(-0.4, 0.4);
+      const length = potR * rng.range(1.1, 1.65) * (1 - 0.3 * t);
+      const out = new Vector3(Math.cos(lphi), 0.35 + 0.5 * t, Math.sin(lphi)).multiplyScalar(potR * 0.3);
+      const from = at.clone().add(out);
+      stems.push(new TubeGeometry(new QuadraticBezierCurve3(at, at.clone().addScaledVector(out, 0.5), from), 3, potR * 0.018, 4));
+      addLeaf(from, lphi, -(0.15 + 0.7 * t) * rng.range(0.8, 1.2), length, rng.range(0.7, 1.4) * (1 - 0.4 * t));
+    }
   }
-  group.add(new Mesh(mergeGeometries(leaves), M.blade));
+  // skirt
+  for (let i = 0; i < 20; i++) {
+    const phi = i * 2.39996 + rng.range(-0.25, 0.25);
+    const at = new Vector3(Math.cos(phi) * potR * 0.75, soilY + potR * rng.range(0.5, 1.1), Math.sin(phi) * potR * 0.75);
+    stems.push(new TubeGeometry(new QuadraticBezierCurve3(new Vector3(at.x * 0.3, soilY, at.z * 0.3), new Vector3(at.x * 0.5, at.y, at.z * 0.5), at), 4, potR * 0.02, 4));
+    addLeaf(at, phi, -rng.range(0.05, 0.35), potR * rng.range(1.5, 2.1), rng.range(1.0, 1.7));
+  }
+  group.add(new Mesh(mergeGeometries(leaves), M.broad), new Mesh(mergeGeometries(stems), M.stem));
   return finish(group);
 }

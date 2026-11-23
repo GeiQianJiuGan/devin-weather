@@ -27,7 +27,7 @@ import {
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { ROOM, ROOM_ORIGIN } from '../core/layout.js';
-import { broadLeafPlant, snakePlant } from './Plants.js';
+import { broadLeafPlant, leafyPlant } from './Plants.js';
 import {
   ScreenContent, contactShadowTexture, latteTexture, linenTexture, marbleTexture, woodFloorTexture, woodGrainTexture,
 } from './textures.js';
@@ -350,24 +350,6 @@ export function buildRoom() {
   rbox(0.13, 0.016, 0.19, 0.004, M.cabinet, tx - 0.02, TABLE_TOP + 0.008, tz - 0.14).rotation.y = 0.5;
   rbox(0.124, 0.012, 0.184, 0.002, M.paper, tx - 0.02, TABLE_TOP + 0.009, tz - 0.14).rotation.y = 0.5;
 
-  // cordless table lamp (the "table lamp" switch)
-  const lx = tx - 0.17;
-  const lz = tz + 0.06;
-  lathe([[0, 0], [0.05, 0], [0.052, 0.006], [0.05, 0.012], [0.012, 0.02], [0.008, 0.03], [0.008, 0.2], [0, 0.2]], M.brass, lx, TABLE_TOP, lz);
-  const shadeProfile = [[0.012, 0.075], [0.04, 0.07], [0.075, 0.05], [0.092, 0.02], [0.095, 0]];
-  const shadeGeo = new LatheGeometry(shadeProfile.map(([r, h]) => new Vector2(r, h)), 40);
-  const shade = add(new Mesh(shadeGeo, mat(0x26342d, 0.4, { side: DoubleSide })));
-  shade.position.set(lx, TABLE_TOP + 0.19, lz);
-  const lampGlowMaterial = new MeshBasicMaterial({ color: 0x000000, side: BackSide, toneMapped: false });
-  const shadeInner = new Mesh(shadeGeo, lampGlowMaterial);
-  shadeInner.position.copy(shade.position);
-  shadeInner.scale.setScalar(0.97);
-  group.add(shadeInner);
-  const bulbMaterial = new MeshBasicMaterial({ color: 0x000000, toneMapped: false });
-  const bulb = new Mesh(new SphereGeometry(0.018, 16, 12), bulbMaterial);
-  bulb.position.set(lx, TABLE_TOP + 0.215, lz);
-  group.add(bulb);
-
   // --- service counter -------------------------------------------------------------------
   const cx0 = -2.02; // customer face
   const cx1 = -1.4;
@@ -610,7 +592,7 @@ export function buildRoom() {
   }
 
   // --- plants -----------------------------------------------------------------------------
-  const floorPlant = snakePlant(11, 0.058, 0.1);
+  const floorPlant = leafyPlant(11, 0.058, 0.1);
   floorPlant.scale.setScalar(3.1);
   floorPlant.position.set(-1.78, 0, 2.02);
   group.add(floorPlant);
@@ -730,17 +712,6 @@ export function buildRoom() {
   pendants.position.set(-3.2, 2.25, 1.0);
   group.add(ceiling, pendants);
 
-  const lamp = new SpotLight(0xffc98f, 0, 4, 1.25, 0.6, 2);
-  lamp.position.copy(bulb.position);
-  const lampTarget = new Object3D();
-  lampTarget.position.set(lx, 0, lz);
-  group.add(lamp, lampTarget);
-  lamp.target = lampTarget;
-  lamp.castShadow = true;
-  lamp.shadow.camera.near = 0.03;
-  lamp.shadow.camera.far = 3;
-  lamp.shadow.bias = -0.002;
-
   group.updateMatrixWorld(true);
   const screenCenter = screen.getWorldPosition(new Vector3());
   const screenNormal = new Vector3(0, 0, 1).transformDirection(screen.matrixWorld);
@@ -763,15 +734,13 @@ export function buildRoom() {
   return {
     group,
     lights: {
-      sun, sunTarget, windowNorth, windowEast, fill, ceiling, pendants, lamp, monitorLight,
+      sun, sunTarget, windowNorth, windowEast, fill, ceiling, pendants, monitorLight,
       windowNorthPoint, windowEastPoint, monitorPoint,
       windowAreaNorth: GN * gh,
       windowAreaEast: GE * gh,
     },
     screenContent,
     screenMaterial,
-    lampGlowMaterial,
-    bulbMaterial,
     fixtureMaterial,
     globeMaterial,
     domeInnerMaterial: domeInner,
@@ -779,7 +748,6 @@ export function buildRoom() {
     anchors: {
       screen: screenCenter,
       pendants: [...pendantAnchors, ...domeAnchors],
-      lamp: bulb.getWorldPosition(new Vector3()),
       centre: new Vector3(-W / 2, 1.2, D / 2).add(ROOM_ORIGIN),
     },
   };

@@ -77,7 +77,7 @@ npm run preview   # 预览生产构建
 | Live weather | 实时模式开关、自动定位开关、城市搜索、精确定位 |
 | Weather | 10 种天气、强度、风力、窗外模糊 |
 | Time of day | 6 个时段、连续时间滑块、自动昼夜循环及速度 |
-| Scene | 玻璃雨滴、车流开关和密度、吊灯、台灯、菜单屏亮度 |
+| Scene | 玻璃雨滴、车流开关和密度、吊灯、菜单屏亮度 |
 | Playback and quality | 暂停、重置、全屏、画质、帧率 |
 | Scene configuration | 整个状态的 JSON，可复制、编辑、应用 |
 
