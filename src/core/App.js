@@ -434,7 +434,8 @@ export class App {
    * switches in the panel follow, so anything turned on by hand during the night stays on.
    */
   closeForNight(state) {
-    const closed = lateness(this.time.env.hour) > 0.5;
+    // the selected hour, not the eased clock: an imported configuration is judged by its own time
+    const closed = lateness(state.time.hour % 24) > 0.5;
     const s = state.scene;
     // the store remembers the closing, so reloads, imports and resets stay consistent
     if (closed === s.closedForNight) return;
