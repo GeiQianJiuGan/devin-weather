@@ -445,26 +445,29 @@ export function buildBack(K) {
   slab(1.5, 0.02, 0.05, M.oak, 0, 1.25, 0.04, board);
 
   // --- staff way in: the gap at the window end of the counter, closed by a counter-height curtain
+  // Two posts stand clear of the counter body and the back bar's doors; the rod runs between them.
   const gz = cz0 + 0.16;
-  const gx0 = cx1 - 0.02;
-  const gx1 = gapX1 + 0.02;
-  const rodY = CT - 0.05;
-  box(0.05, CT - 0.02, 0.05, M.oak, gx1 - 0.025, (CT - 0.02) / 2, gz);
-  stick(v(gx0, rodY, gz), v(gx1, rodY, gz), 0.008, M.brass);
+  const postH = CT - 0.07; // under the counter top's overhang
+  const pA = cx1 + 0.01;
+  const pB = gapX1 - 0.065;
+  const rodY = postH - 0.05;
+  for (const x of [pA, pB]) box(0.04, postH, 0.04, M.oak, x, postH / 2, gz);
+  stick(v(pA, rodY, gz), v(pB, rodY, gz), 0.007, M.brass);
   const cloth = linenTexture([66, 86, 100]);
   cloth.wrapS = cloth.wrapT = RepeatWrapping;
   cloth.repeat.set(2, 3);
   const curtainCloth = new MeshStandardMaterial({ map: cloth, roughness: 1, side: DoubleSide });
-  const pw = (gx1 - 0.05 - gx0) / 2 - 0.006;
-  const drop = rodY - 0.14;
-  const gcx = (gx0 + gx1 - 0.05) / 2;
+  const clear = pB - pA - 0.04 - 0.02; // between the posts, with a finger of air either side
+  const pw = clear / 2 - 0.004;
+  const drop = rodY - 0.12;
+  const gcx = (pA + pB) / 2;
   for (const s of [-1, 1]) {
-    const geo = new PlaneGeometry(pw, drop, 18, 6);
+    const geo = new PlaneGeometry(pw, drop, 20, 8);
     const p = geo.getAttribute('position');
     for (let i = 0; i < p.count; i++) {
-      // hangs flat from the rod and ripples more towards the hem
+      // pinned flat along the rod, the folds open up towards the hem
       const low = 0.5 - p.getY(i) / drop;
-      p.setZ(i, Math.sin(p.getX(i) * 30 + s * 1.7) * 0.012 * (0.25 + low) + s * 0.01 * low);
+      p.setZ(i, Math.sin(p.getX(i) * 34 + s * 1.7) * 0.011 * low);
     }
     geo.computeVertexNormals();
     const panel = new Mesh(geo, curtainCloth);
@@ -472,11 +475,13 @@ export function buildBack(K) {
     panel.castShadow = true;
     panel.receiveShadow = true;
     group.add(panel);
-    box(pw, 0.03, 0.01, mat(0xd8cdb6, 0.95), gcx + s * (pw / 2 + 0.004), rodY - drop + 0.1, gz).castShadow = false;
   }
-  box(0.3, 0.075, 0.012, M.oak, gcx, rodY - 0.09, gz - 0.03).castShadow = false;
-  const staffOnly = lettered('STAFF ONLY', 0.28, 0.06, '#efe6d2', '#3a2c20');
-  staffOnly.position.set(gcx, rodY - 0.09, gz - 0.037);
+  // a small plaque hung off the rod on two cords, in front of the cloth
+  const plaqueZ = gz - 0.022;
+  box(0.26, 0.07, 0.01, M.oak, gcx, rodY - 0.1, plaqueZ).castShadow = false;
+  for (const s of [-1, 1]) stick(v(gcx + s * 0.1, rodY - 0.065, plaqueZ), v(gcx + s * 0.1, rodY, gz - 0.007), 0.002, M.brass);
+  const staffOnly = lettered('STAFF ONLY', 0.24, 0.055, '#efe6d2', '#3a2c20');
+  staffOnly.position.set(gcx, rodY - 0.1, plaqueZ - 0.0055);
   staffOnly.rotation.y = Math.PI;
   group.add(staffOnly);
 

@@ -314,8 +314,9 @@ export function buildRoom() {
   const windowTables = [-3.4, -5.2];
   windowTables.forEach((x, i) => {
     table(x, 0.82);
-    chair(x + 0.56, 0.84, -Math.PI / 2 - 0.12);
-    chair(x - 0.56, 0.8, Math.PI / 2 + (i === 0 ? 0.3 : 0.08));
+    // squared up to the table and the glass, the same distance either side
+    chair(x + 0.6, 0.82, -Math.PI / 2);
+    chair(x - 0.6, 0.82, Math.PI / 2);
     const bunch = flowerArrangement(8 + i * 5, 0.12, 6);
     bunch.position.set(i === 0 ? x - 0.17 : x + 0.03, TABLE_TOP, i === 0 ? 0.92 : 0.8);
     group.add(bunch);
