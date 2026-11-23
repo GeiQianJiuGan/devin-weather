@@ -83,9 +83,10 @@ const LOCATORS = [
   ['https://api.ip.sb/geoip', (d) => d],
 ];
 
-/** Approximate place of the visitor, from the IP address. */
-export async function locateByIp() {
+/** Approximate place of the visitor, from the IP address. No further service is asked once `cancelled()` is true. */
+export async function locateByIp(cancelled = () => false) {
   for (const [url, pick] of LOCATORS) {
+    if (cancelled()) return null;
     try {
       const d = pick(await getJson(url));
       const lat = Number(d?.latitude);
@@ -157,7 +158,7 @@ export class LiveWeather {
   async locate() {
     const id = ++this.request;
     this.setStatus('loading', 'Finding your location...');
-    const place = await locateByIp();
+    const place = await locateByIp(() => id !== this.request);
     if (id !== this.request) return;
     if (place) {
       const s = this.store;
