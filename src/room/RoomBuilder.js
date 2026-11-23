@@ -18,7 +18,6 @@ import {
   PointLight,
   RectAreaLight,
   SphereGeometry,
-  SpotLight,
   TorusGeometry,
   TubeGeometry,
   Vector2,
@@ -27,7 +26,8 @@ import {
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { ROOM, ROOM_ORIGIN } from '../core/layout.js';
-import { broadLeafPlant, leafyPlant } from './Plants.js';
+import { buildBack } from './BackRoom.js';
+import { flowerArrangement } from './Plants.js';
 import {
   ScreenContent, contactShadowTexture, latteTexture, linenTexture, marbleTexture, woodFloorTexture, woodGrainTexture,
 } from './textures.js';
@@ -126,8 +126,6 @@ export function buildRoom() {
     pastryDark: mat(0x8a4f22, 0.7),
     paper: mat(0xf2ede2, 0.8),
     kraft: mat(0xb08a5c, 0.85),
-    twig: mat(0x6b5136, 0.8),
-    sage: mat(0x8ea183, 0.8, { side: DoubleSide }),
   };
 
   const add = (mesh, cast = true, receive = true, parent = group) => {
@@ -188,10 +186,11 @@ export function buildRoom() {
   floorTex.repeat.set(W / 2, D / 2);
   flat(W, D, new MeshStandardMaterial({ map: floorTex, color: 0xc9c2b8, roughness: 0.45 }), -W / 2, 0, D / 2);
   box(W + 0.6, 0.2, D + 0.6, M.ceiling, -W / 2, H + 0.1, D / 2);
-  box(0.2, H, D + 0.4, M.wall, -W - 0.1, H / 2, D / 2);
-  box(W + 0.4, H, 0.2, M.wall, -W / 2, H / 2, D + 0.1);
-  box(W - GN, H, 0.2, M.wall, -(W + GN) / 2, H / 2, -0.1);
-  box(0.2, H, D - GE, M.wall, 0.1, H / 2, (D + GE) / 2);
+  // the solid walls run up into the ceiling slab so no daylight shows along the joint
+  box(0.2, H + 0.1, D + 0.4, M.wall, -W - 0.1, H / 2 + 0.05, D / 2);
+  box(W + 0.4, H + 0.1, 0.2, M.wall, -W / 2, H / 2 + 0.05, D + 0.1);
+  box(W - GN, H + 0.1, 0.2, M.wall, -(W + GN) / 2, H / 2 + 0.05, -0.1);
+  box(0.2, H + 0.1, D - GE, M.wall, 0.1, H / 2 + 0.05, (D + GE) / 2);
   box(GN + 0.2, H - Y1, 0.2, M.wall, -GN / 2 + 0.1, (H + Y1) / 2, -0.1);
   box(0.2, H - Y1, GE, M.wall, 0.1, (H + Y1) / 2, GE / 2);
   box(GN + 0.2, Y0, 0.2, M.frame, -GN / 2 + 0.1, Y0 / 2, -0.1);
@@ -311,35 +310,15 @@ export function buildRoom() {
     return g;
   };
 
-  // small bud vase with a few dried stems
-  const vase = (x, y, z, material, seed) => {
-    const g = new Group();
-    g.position.set(x, y, z);
-    group.add(g);
-    lathe([[0, 0], [0.022, 0], [0.034, 0.02], [0.036, 0.045], [0.02, 0.085], [0.012, 0.11], [0.015, 0.118], [0.011, 0.118], [0.009, 0.1], [0, 0.1]], material, 0, 0, 0, g);
-    for (let k = 0; k < 4; k++) {
-      const a = seed + k * 1.9;
-      const lean = 0.035 + 0.02 * ((k * 7 + seed) % 3);
-      const tip = v(Math.cos(a) * lean, 0.3 + 0.03 * (k % 3), Math.sin(a) * lean);
-      stick(v(0, 0.08, 0), tip, 0.0016, M.twig, g);
-      for (let j = 0; j < 5; j++) {
-        const t = 0.45 + j * 0.13;
-        const leaf = add(new Mesh(new SphereGeometry(0.011, 8, 6), M.sage), true, true, g);
-        leaf.scale.set(1, 0.25, 0.7);
-        leaf.position.set(tip.x * t + Math.cos(a + j * 2.4) * 0.012, 0.08 + (tip.y - 0.08) * t, tip.z * t + Math.sin(a + j * 2.4) * 0.012);
-        leaf.rotation.set(j * 1.1, a + j * 2.4, 0.6);
-      }
-    }
-    return g;
-  };
-
   // window tables along the north glass
   const windowTables = [-1.6, -3.4, -5.2];
   windowTables.forEach((x, i) => {
     table(x, 0.82);
     chair(x + 0.56, 0.84, -Math.PI / 2 + (i === 0 ? 0.25 : -0.12));
     chair(x - 0.56, 0.8, Math.PI / 2 + (i === 1 ? 0.3 : 0.08));
-    if (i !== 1) vase(x + 0.05, TABLE_TOP, 0.66, M.porcelain, i * 2.3 + 1);
+    const bunch = flowerArrangement(3 + i * 5, 0.12, 6);
+    bunch.position.set(i === 1 ? x - 0.17 : x + 0.03, TABLE_TOP, i === 1 ? 0.92 : 0.8);
+    group.add(bunch);
   });
   // the table for two the camera faces: a coffee left on it, but nobody is here
   const tx = windowTables[1];
@@ -443,9 +422,9 @@ export function buildRoom() {
     stick(v(px - 0.13, CT + 0.006, 4.36), v(px - 0.13 + Math.cos(k * 2.4) * 0.03, CT + 0.19, 4.36 + Math.sin(k * 2.4) * 0.03), 0.0025, k % 3 ? M.paper : M.kraft);
   }
   for (let k = 0; k < 4; k++) rbox(0.11, 0.004, 0.11, 0.001, M.paper, px + 0.08, CT + 0.003 + k * 0.004, 2.8).rotation.y = k * 0.13;
-  const counterPlant = broadLeafPlant(23, 0.06, 0.1);
-  counterPlant.position.set(px + 0.04, CT, 4.75);
-  group.add(counterPlant);
+  const counterFlowers = flowerArrangement(8, 0.19, 9);
+  counterFlowers.position.set(px + 0.04, CT, 4.75);
+  group.add(counterFlowers);
 
   // --- back bar under the east window ------------------------------------------------------
   const bx0 = -0.66;
@@ -591,12 +570,6 @@ export function buildRoom() {
     lathe([[0, 0], [0.05, 0], [0.052, 0.012], [0.02, 0.018], [0, 0.018]], M.oak, -0.34, BT + 0.152, z, group, 24);
   }
 
-  // --- plants -----------------------------------------------------------------------------
-  const floorPlant = leafyPlant(11, 0.058, 0.1);
-  floorPlant.scale.setScalar(3.1);
-  floorPlant.position.set(-1.78, 0, 2.02);
-  group.add(floorPlant);
-
   // --- pendants -----------------------------------------------------------------------------
   // The "interior lighting" switch: brass domes over the counter, opal globes over the window tables.
   const fixtureMaterial = new MeshBasicMaterial({ color: 0x000000, toneMapped: false });
@@ -676,7 +649,8 @@ export function buildRoom() {
   for (const x of windowTables) blob(1.9, 1.0, x, 0.82, 0.42);
   blob(1.3, cz1 - cz0 + 0.7, (cx0 + cx1) / 2 - 0.1, (cz0 + cz1) / 2, 0.7);
   blob(1.0, bz1 - bz0 + 0.5, (bx0 + bx1) / 2 - 0.1, (bz0 + bz1) / 2, 0.6);
-  blob(0.6, 0.6, -1.78, 2.02, 0.5);
+
+  buildBack({ group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, pendantDome, TABLE_TOP });
 
   // --- lights ----------------------------------------------------------------------
   const sun = new DirectionalLight(0xffffff, 0);
