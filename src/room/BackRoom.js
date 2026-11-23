@@ -388,9 +388,9 @@ export function buildBack(K) {
   }
 
   // --- ordering point at the door end of the counter -----------------------------------------
-  const { x0: cx0, x1: cx1, z1: cz1, top: CT } = counter;
+  const { x0: cx0, x1: cx1, z0: cz0, z1: cz1, top: CT, gapX1 } = counter;
   const ccx = (cx0 + cx1) / 2;
-  const oz = cz1 - 0.5;
+  const oz = cz1 - 1.15;
   // till: a tablet on a stand, turned to the customer
   const till = new Group();
   till.position.set(ccx + 0.06, CT, oz);
@@ -444,44 +444,44 @@ export function buildBack(K) {
   board.add(menu);
   slab(1.5, 0.02, 0.05, M.oak, 0, 1.25, 0.04, board);
 
-  // --- staff way in: a doorway between the counter and the wall, hung with a split curtain ----
-  const gx = cx0 + 0.05;
-  const gz0 = cz1 + 0.07;
-  const gz1 = cz1 + 0.95;
-  for (const z of [gz0, gz1]) box(0.07, 2.12, 0.07, M.oak, gx, 1.06, z);
-  box(0.09, 0.09, gz1 - gz0 + 0.11, M.oak, gx, 2.165, (gz0 + gz1) / 2);
-  box(0.04, 2.21, D - gz1 - 0.035, M.oak, gx, 1.105, (gz1 + 0.035 + D) / 2);
-  stick(v(gx, 2.06, gz0), v(gx, 2.06, gz1), 0.008, M.brass);
+  // --- staff way in: the gap at the window end of the counter, closed by a counter-height curtain
+  const gz = cz0 + 0.16;
+  const gx0 = cx1 - 0.02;
+  const gx1 = gapX1 + 0.02;
+  const rodY = CT - 0.05;
+  box(0.05, CT - 0.02, 0.05, M.oak, gx1 - 0.025, (CT - 0.02) / 2, gz);
+  stick(v(gx0, rodY, gz), v(gx1, rodY, gz), 0.008, M.brass);
   const cloth = linenTexture([66, 86, 100]);
   cloth.wrapS = cloth.wrapT = RepeatWrapping;
-  cloth.repeat.set(2, 5);
+  cloth.repeat.set(2, 3);
   const curtainCloth = new MeshStandardMaterial({ map: cloth, roughness: 1, side: DoubleSide });
-  const pw = (gz1 - gz0 - 0.07) / 2 - 0.006;
-  const drop = 1.34;
+  const pw = (gx1 - 0.05 - gx0) / 2 - 0.006;
+  const drop = rodY - 0.14;
+  const gcx = (gx0 + gx1 - 0.05) / 2;
   for (const s of [-1, 1]) {
-    const geo = new PlaneGeometry(pw, drop, 22, 8);
+    const geo = new PlaneGeometry(pw, drop, 18, 6);
     const p = geo.getAttribute('position');
     for (let i = 0; i < p.count; i++) {
       // hangs flat from the rod and ripples more towards the hem
       const low = 0.5 - p.getY(i) / drop;
-      p.setZ(i, Math.sin(p.getX(i) * 26 + s * 1.7) * 0.014 * (0.25 + low) + s * 0.012 * low);
+      p.setZ(i, Math.sin(p.getX(i) * 30 + s * 1.7) * 0.012 * (0.25 + low) + s * 0.01 * low);
     }
     geo.computeVertexNormals();
     const panel = new Mesh(geo, curtainCloth);
-    panel.position.set(gx, 2.05 - drop / 2, (gz0 + gz1) / 2 + s * (pw / 2 + 0.004));
-    panel.rotation.y = Math.PI / 2;
+    panel.position.set(gcx + s * (pw / 2 + 0.004), rodY - drop / 2, gz);
     panel.castShadow = true;
     panel.receiveShadow = true;
     group.add(panel);
-    box(0.012, 0.03, pw, mat(0xd8cdb6, 0.95), gx, 2.05 - drop + 0.12, (gz0 + gz1) / 2 + s * (pw / 2 + 0.004)).castShadow = false;
+    box(pw, 0.03, 0.01, mat(0xd8cdb6, 0.95), gcx + s * (pw / 2 + 0.004), rodY - drop + 0.1, gz).castShadow = false;
   }
-  const staffOnly = lettered('STAFF ONLY', 0.36, 0.08, '#efe6d2', '#3a2c20');
-  staffOnly.position.set(gx - 0.046, 2.165, (gz0 + gz1) / 2);
-  staffOnly.rotation.y = -Math.PI / 2;
+  box(0.3, 0.075, 0.012, M.oak, gcx, rodY - 0.09, gz - 0.03).castShadow = false;
+  const staffOnly = lettered('STAFF ONLY', 0.28, 0.06, '#efe6d2', '#3a2c20');
+  staffOnly.position.set(gcx, rodY - 0.09, gz - 0.037);
+  staffOnly.rotation.y = Math.PI;
   group.add(staffOnly);
 
   // --- greenery -------------------------------------------------------------------------
-  for (const [seed, scale, x, z] of [[11, 3.1, -7.7, 0.72], [19, 2.3, -8.02, 6.5], [23, 1.5, doorX + doorHalf + 0.2, 6.76]]) {
+  for (const [seed, scale, x, z] of [[11, 3.1, -7.7, 0.72], [19, 2.3, -8.02, 6.5]]) {
     const plant = leafyPlant(seed, 0.058, 0.1);
     plant.scale.setScalar(scale);
     plant.position.set(x, 0, z);

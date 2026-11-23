@@ -310,18 +310,18 @@ export function buildRoom() {
     return g;
   };
 
-  // window tables along the north glass
-  const windowTables = [-1.6, -3.4, -5.2];
+  // window tables along the north glass; the corner by the counter is left clear for the staff gap
+  const windowTables = [-3.4, -5.2];
   windowTables.forEach((x, i) => {
     table(x, 0.82);
-    chair(x + 0.56, 0.84, -Math.PI / 2 + (i === 0 ? 0.25 : -0.12));
-    chair(x - 0.56, 0.8, Math.PI / 2 + (i === 1 ? 0.3 : 0.08));
-    const bunch = flowerArrangement(3 + i * 5, 0.12, 6);
-    bunch.position.set(i === 1 ? x - 0.17 : x + 0.03, TABLE_TOP, i === 1 ? 0.92 : 0.8);
+    chair(x + 0.56, 0.84, -Math.PI / 2 - 0.12);
+    chair(x - 0.56, 0.8, Math.PI / 2 + (i === 0 ? 0.3 : 0.08));
+    const bunch = flowerArrangement(8 + i * 5, 0.12, 6);
+    bunch.position.set(i === 0 ? x - 0.17 : x + 0.03, TABLE_TOP, i === 0 ? 0.92 : 0.8);
     group.add(bunch);
   });
   // the table for two the camera faces: a coffee left on it, but nobody is here
-  const tx = windowTables[1];
+  const tx = windowTables[0];
   const tz = 0.82;
   cup(tx + 0.08, TABLE_TOP, tz + 0.1, group, { filled: true, rot: 0.7 });
   const spoon = stick(v(tx + 0.17, TABLE_TOP + 0.012, tz + 0.13), v(tx + 0.2, TABLE_TOP + 0.013, tz + 0.03), 0.0022, M.steel);
@@ -333,7 +333,7 @@ export function buildRoom() {
   const cx0 = -2.02; // customer face
   const cx1 = -1.4;
   const cz0 = 1.22; // the counter and its return wall the bar in; staff come and go at the far end
-  const cz1 = 5.7;
+  const cz1 = ROOM.d - 0.05; // runs into the south wall, so the only way behind it is the gap at the window end
   const CH = 0.98;
   box(cx1 - cx0 - 0.03, CH - 0.1, cz1 - cz0 - 0.03, M.walnut, (cx0 + cx1) / 2, 0.1 + (CH - 0.1) / 2, (cz0 + cz1) / 2);
   box(cx1 - cx0 - 0.12, 0.1, cz1 - cz0 - 0.12, M.black, (cx0 + cx1) / 2, 0.05, (cz0 + cz1) / 2);
@@ -347,16 +347,7 @@ export function buildRoom() {
   box(cx1 - cx0 + 0.01, 0.03, 0.012, M.brass, (cx0 + cx1) / 2, 0.115, cz0 - 0.002);
   slab(cx1 - cx0 + 0.1, 0.04, cz1 - cz0 + 0.08, M.marble, (cx0 + cx1) / 2 - 0.02, CH + 0.02, (cz0 + cz1) / 2 - 0.02);
   const CT = CH + 0.04;
-  // return closing the north end of the working aisle, up to the back bar
-  const rx1 = -0.66;
-  const rd = 0.42;
-  box(rx1 - cx1, CH - 0.1, rd - 0.03, M.walnut, (cx1 + rx1) / 2, 0.1 + (CH - 0.1) / 2, cz0 + rd / 2);
-  box(rx1 - cx1, 0.1, rd - 0.12, M.black, (cx1 + rx1) / 2, 0.05, cz0 + rd / 2);
-  const fluteReturn = add(new Mesh(flutedGeometry(rx1 - cx1, CH - 0.14), M.walnut));
-  fluteReturn.position.set(rx1, 0.1, cz0 + 0.016);
-  fluteReturn.rotation.y = Math.PI;
-  box(rx1 - cx1, 0.03, 0.012, M.brass, (cx1 + rx1) / 2, 0.115, cz0 - 0.002);
-  slab(rx1 - cx1 + 0.06, 0.04, rd + 0.06, M.marble, (cx1 + rx1) / 2, CH + 0.02, cz0 + rd / 2 - 0.01);
+  const rx1 = -0.66; // staff gap at the window end: between the counter and the back bar
   // brass foot rail
   stick(v(cx0 - 0.13, 0.17, cz0 + 0.1), v(cx0 - 0.13, 0.17, cz1 - 0.1), 0.014, M.brass);
   for (const z of [cz0 + 0.25, (cz0 + cz1) / 2, cz1 - 0.25]) {
@@ -653,7 +644,7 @@ export function buildRoom() {
     bulb.position.y = 0.115;
     g.add(bulb);
   };
-  windowTables.forEach((x, i) => pendantShade(x, 2.2 - (i % 2) * 0.12, 0.82, (i - 1) * 0.9));
+  [-1.6, ...windowTables].forEach((x, i) => pendantShade(x, 2.2 - (i % 2) * 0.12, 0.82, (i - 1) * 0.9));
 
   // fake contact shadows (area and point lights cast no shadows of their own)
   const shadowTex = contactShadowTexture();
@@ -666,7 +657,7 @@ export function buildRoom() {
   blob(1.3, cz1 - cz0 + 0.7, (cx0 + cx1) / 2 - 0.1, (cz0 + cz1) / 2, 0.7);
   blob(1.0, bz1 - bz0 + 0.5, (bx0 + bx1) / 2 - 0.1, (bz0 + bz1) / 2, 0.6);
 
-  const { curtainMaterial, sconceMaterial } = buildBack({ counter: { x0: cx0, x1: cx1, z1: cz1, top: CT }, group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, pendantDome, TABLE_TOP });
+  const { curtainMaterial, sconceMaterial } = buildBack({ counter: { x0: cx0, x1: cx1, z0: cz0, z1: cz1, top: CT, gapX1: rx1 }, group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, pendantDome, TABLE_TOP });
 
   // --- lights ----------------------------------------------------------------------
   const sun = new DirectionalLight(0xffffff, 0);
