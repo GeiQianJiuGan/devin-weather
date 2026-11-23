@@ -268,6 +268,8 @@ export class App {
     }
     const tag = e.target.tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
+    // focus inside the settings panel: the keys belong to its controls and its scrolling
+    if (e.target.closest?.('#panel')) return;
     if (e.code === 'KeyR') this.resetView();
     else if (MOVE_KEYS.has(e.code)) {
       this.keys.add(e.code);
