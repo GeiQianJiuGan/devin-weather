@@ -190,7 +190,7 @@ export function buildBack(K) {
 
   // --- shared table --------------------------------------------------------------------
   const sx = -4.4;
-  const sz = 4.1;
+  const sz = 4.15; // under the middle of a ceiling bay
   slab(2.3, 0.045, 0.88, M.oak, sx, 0.7275, sz);
   for (const a of [-1, 1]) {
     for (const b of [-1, 1]) box(0.07, 0.705, 0.07, M.oak, sx + a * 1.02, 0.3525, sz + b * 0.34);

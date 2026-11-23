@@ -186,6 +186,12 @@ export function buildRoom() {
   floorTex.repeat.set(W / 2, D / 2);
   flat(W, D, new MeshStandardMaterial({ map: floorTex, color: 0xc9c2b8, roughness: 0.45 }), -W / 2, 0, D / 2);
   box(W + 0.6, 0.2, D + 0.6, M.ceiling, -W / 2, H + 0.1, D / 2);
+  // Exposed timber joists across the room, a wall plate at each end. Every pendant hangs in the
+  // middle of a bay (bay centres at 0.85 + k * 1.1), so no cord meets a joist.
+  for (let z = 0.3; z < D - 0.3; z += 1.1) {
+    box(W, 0.18, 0.14, M.oak, -W / 2, H - 0.09, z);
+    for (const x of [-0.03, -W + 0.03]) box(0.06, 0.05, 0.2, M.black, x, H - 0.205, z).castShadow = false;
+  }
   // the solid walls run up into the ceiling slab so no daylight shows along the joint
   box(0.2, H + 0.1, D + 0.4, M.wall, -W - 0.1, H / 2 + 0.05, D / 2);
   box(W + 0.4, H + 0.1, 0.2, M.wall, -W / 2, H / 2 + 0.05, D + 0.1);
@@ -599,7 +605,7 @@ export function buildRoom() {
     b.position.set(x, y + 0.075, z);
     group.add(b);
   };
-  const domeAnchors = [3.0, 3.75, 4.5].map((z) => {
+  const domeAnchors = [1.95, 3.05, 4.15].map((z) => {
     pendantDome((cx0 + cx1) / 2, 2.12, z);
     return new Vector3((cx0 + cx1) / 2, 2.14, z).add(ROOM_ORIGIN);
   });
@@ -622,7 +628,7 @@ export function buildRoom() {
     pendantAnchors.push(new Vector3(x, y + 0.02, z).add(ROOM_ORIGIN));
     const g = new Group();
     g.position.set(x, y, z);
-    g.rotation.set(sway * 0.02, sway, -sway * 0.015);
+    g.rotation.y = sway; // hangs plumb: only the shade's seam is turned
     group.add(g);
     // ceiling rose and cord with a strain-relief grip
     cyl(0.045, 0.05, 0.022, M.brass, x, H - 0.011, z, group, 28);
@@ -645,7 +651,7 @@ export function buildRoom() {
     bulb.position.y = 0.115;
     g.add(bulb);
   };
-  [-1.6, ...windowTables].forEach((x, i) => pendantShade(x, 2.2 - (i % 2) * 0.12, 0.82, (i - 1) * 0.9));
+  [-1.6, ...windowTables].forEach((x, i) => pendantShade(x, 2.14, 0.85, (i - 1) * 0.9));
 
   // fake contact shadows (area and point lights cast no shadows of their own)
   const shadowTex = contactShadowTexture();
