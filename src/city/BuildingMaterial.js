@@ -29,11 +29,13 @@ vBSize = aSize;
 vBStyle = aStyle;
 vBTint = aTint;
 vBMisc = aMisc;
-vec4 bWorld = vec4(transformed, 1.0);
+// view ray in the building's own axes (some towers are rotated), for the window glass
+mat4 bModel = modelMatrix;
 #ifdef USE_INSTANCING
-  bWorld = instanceMatrix * bWorld;
+  bModel = modelMatrix * instanceMatrix;
 #endif
-vBView = (modelMatrix * bWorld).xyz - cameraPosition;
+vec3 bRay = (bModel * vec4(transformed, 1.0)).xyz - cameraPosition;
+vBView = vec3(dot(bRay, normalize(bModel[0].xyz)), dot(bRay, normalize(bModel[1].xyz)), dot(bRay, normalize(bModel[2].xyz)));
 `;
 
 const FRAG_PARS = /* glsl */ `
