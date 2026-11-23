@@ -423,7 +423,7 @@ export function buildRoom() {
   }
   for (let k = 0; k < 4; k++) rbox(0.11, 0.004, 0.11, 0.001, M.paper, px + 0.08, CT + 0.003 + k * 0.004, 2.8).rotation.y = k * 0.13;
   const counterFlowers = flowerArrangement(8, 0.19, 9);
-  counterFlowers.position.set(px + 0.04, CT, 4.75);
+  counterFlowers.position.set(px + 0.04, CT, 4.66);
   group.add(counterFlowers);
 
   // --- back bar under the east window ------------------------------------------------------
@@ -650,7 +650,7 @@ export function buildRoom() {
   blob(1.3, cz1 - cz0 + 0.7, (cx0 + cx1) / 2 - 0.1, (cz0 + cz1) / 2, 0.7);
   blob(1.0, bz1 - bz0 + 0.5, (bx0 + bx1) / 2 - 0.1, (bz0 + bz1) / 2, 0.6);
 
-  const { curtainMaterial } = buildBack({ group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, pendantDome, TABLE_TOP });
+  const { curtainMaterial, sconceMaterial } = buildBack({ counter: { x0: cx0, x1: cx1, z1: cz1, top: CT }, group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, pendantDome, TABLE_TOP });
 
   // --- lights ----------------------------------------------------------------------
   const sun = new DirectionalLight(0xffffff, 0);
@@ -719,6 +719,7 @@ export function buildRoom() {
     globeMaterial,
     domeInnerMaterial: domeInner,
     curtainMaterial,
+    sconceMaterial,
     shadeInnerMaterial: pendantShadeInner,
     anchors: {
       screen: screenCenter,
