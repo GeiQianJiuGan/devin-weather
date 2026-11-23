@@ -36,7 +36,7 @@ import {
 // The second-floor cafe: shell with a glazed corner, a marble-topped service
 // counter with a fluted timber front, the back bar under the east window
 // (espresso machine, grinders, pour-over gear), window tables with timber
-// chairs, pendant lights and all interior light sources. Nobody is in.
+// chairs, ceiling spotlights and all interior light sources. Nobody is in.
 // Local frame: origin at the glass corner on the floor, room extends to -X / +Z.
 
 const UP = new Vector3(0, 1, 0);
@@ -626,32 +626,25 @@ export function buildRoom() {
     lathe([[0, 0], [0.05, 0], [0.052, 0.012], [0.02, 0.018], [0, 0.018]], M.oak, -0.34, BT + 0.152, z, group, 24);
   }
 
-  // --- pendants -----------------------------------------------------------------------------
-  // The "interior lighting" switch: brass domes over the counter, opal globes over the window tables.
+  // --- spotlights ---------------------------------------------------------------------------
+  // The "interior lighting" switch. No pendants: small surface-mounted cans on the raised ceiling
+  // over the window tables and the long table, and under the slat raft over the counter.
   const fixtureMaterial = new MeshBasicMaterial({ color: 0x000000, toneMapped: false });
   const globeMaterial = new MeshBasicMaterial({ color: 0x000000, toneMapped: false });
-  const domeProfile = [[0.018, 0.2], [0.03, 0.19], [0.06, 0.15], [0.12, 0.07], [0.16, 0.015], [0.165, 0]];
-  const domeGeo = new LatheGeometry(domeProfile.map(([r, h]) => new Vector2(r, h)), 48);
-  const domeInner = new MeshBasicMaterial({ color: 0x000000, side: BackSide, toneMapped: false });
-  const pendantDome = (x, y, z) => {
-    stick(v(x, y + 0.2, z), v(x, H, z), 0.004, M.black).castShadow = false;
-    cyl(0.05, 0.05, 0.02, M.brass, x, H - 0.01, z, group, 24);
-    cyl(0.02, 0.018, 0.05, M.brass, x, y + 0.215, z, group, 16);
-    const dome = add(new Mesh(domeGeo, M.black), false);
-    dome.position.set(x, y, z);
-    const inner = new Mesh(domeGeo, domeInner);
-    inner.position.set(x, y, z);
-    inner.scale.setScalar(0.985);
-    group.add(inner);
-    const b = new Mesh(new SphereGeometry(0.032, 16, 12), fixtureMaterial);
-    b.position.set(x, y + 0.075, z);
-    group.add(b);
+  const domeInner = new MeshBasicMaterial({ color: 0x000000, toneMapped: false });
+  const pendantShadeInner = new MeshStandardMaterial({ color: 0xe9e3d4, roughness: 0.6, emissive: 0xffd9a8, emissiveIntensity: 0 });
+  /** A can fixed under a surface at height `y`: black body, brass collar, lit lens. Returns the lens position. */
+  const spot = (x, y, z, lensMaterial = fixtureMaterial) => {
+    cyl(0.05, 0.05, 0.012, M.black, x, y - 0.006, z, group, 24).castShadow = false;
+    cyl(0.038, 0.038, 0.1, M.black, x, y - 0.062, z, group, 24).castShadow = false;
+    cyl(0.04, 0.04, 0.008, M.brass, x, y - 0.112, z, group, 24).castShadow = false;
+    const lens = new Mesh(new CylinderGeometry(0.03, 0.03, 0.004, 20), lensMaterial);
+    lens.position.set(x, y - 0.117, z);
+    group.add(lens);
+    return new Vector3(x, y - 0.117, z);
   };
-  const domeAnchors = [1.95, 3.05, 4.15].map((z) => {
-    pendantDome((cx0 + cx1) / 2, 2.12, z);
-    return new Vector3((cx0 + cx1) / 2, 2.14, z).add(ROOM_ORIGIN);
-  });
-  // A timber slat raft hung over the counter; the dome cords drop through the gaps between slats.
+  const ceilingSpot = (x, z) => spot(x, H, z);
+  // A timber slat raft hung over the counter; the counter's spotlights sit in the gaps between slats.
   const raftX = (cx0 + cx1) / 2;
   const raftZ0 = 1.5;
   const raftZ1 = D - SW - 0.1;
@@ -661,49 +654,8 @@ export function buildRoom() {
     box(1.0, 0.04, 0.04, M.oak, raftX, raftY + 0.11, z);
     for (const sgn of [-1, 1]) stick(v(raftX + sgn * 0.4, raftY + 0.13, z), v(raftX + sgn * 0.4, H, z), 0.005, M.black).castShadow = false;
   }
-  // Over the window tables: enamelled spun-metal shades on a twisted cord, each with a brass
-  // lamp holder, a vented neck and a frosted bulb that sits just above the rim.
-  const pendantShadeProfile = [
-    [0.021, 0.2], [0.03, 0.198], [0.036, 0.186], [0.04, 0.166], [0.056, 0.14], [0.086, 0.104],
-    [0.118, 0.062], [0.14, 0.024], [0.147, 0.006], [0.15, 0], [0.147, -0.004],
-  ];
-  const pendantShadeGeo = new LatheGeometry(pendantShadeProfile.map(([r, h]) => new Vector2(r, h)), 56);
-  // the profile runs top-down, so the lathe's front faces look inwards
-  const pendantShadeOuter = new MeshStandardMaterial({ color: 0x39453c, roughness: 0.34, metalness: 0.25, side: BackSide });
-  const pendantShadeInner = new MeshStandardMaterial({
-    color: 0xe9e3d4, roughness: 0.6, emissive: 0xffd9a8, emissiveIntensity: 0,
-  });
-  const pendantBulbProfile = [[0, -0.048], [0.014, -0.045], [0.024, -0.036], [0.03, -0.02], [0.03, -0.006], [0.024, 0.014], [0.015, 0.03], [0.013, 0.05]];
-  const pendantBulbGeo = new LatheGeometry(pendantBulbProfile.map(([r, h]) => new Vector2(r, h)), 24);
-  const pendantAnchors = [];
-  const pendantShade = (x, y, z, sway) => {
-    pendantAnchors.push(new Vector3(x, y + 0.02, z).add(ROOM_ORIGIN));
-    const g = new Group();
-    g.position.set(x, y, z);
-    g.rotation.y = sway; // hangs plumb: only the shade's seam is turned
-    group.add(g);
-    // ceiling rose and cord with a strain-relief grip
-    cyl(0.045, 0.05, 0.022, M.brass, x, H - 0.011, z, group, 28);
-    cyl(0.012, 0.016, 0.03, M.brass, x, H - 0.036, z, group, 16);
-    stick(v(x, y + 0.26, z), v(x, H - 0.03, z), 0.0032, M.black).castShadow = false;
-    cyl(0.008, 0.011, 0.03, M.black, 0, 0.262, 0, g, 12);
-    // lamp holder: knurled brass cup with two collars
-    cyl(0.019, 0.021, 0.05, M.brass, 0, 0.222, 0, g, 24);
-    cyl(0.024, 0.024, 0.006, M.brass, 0, 0.236, 0, g, 24);
-    cyl(0.026, 0.026, 0.007, M.brass, 0, 0.2, 0, g, 24);
-    add(new Mesh(pendantShadeGeo, pendantShadeOuter), false, false, g);
-    const inner = new Mesh(pendantShadeGeo, pendantShadeInner);
-    inner.scale.set(0.985, 0.985, 0.985);
-    g.add(inner);
-    const rim = add(new Mesh(new TorusGeometry(0.149, 0.0035, 8, 56), M.brass), false, false, g);
-    rim.rotation.x = Math.PI / 2;
-    rim.position.y = 0.001;
-    cyl(0.014, 0.014, 0.03, M.brass, 0, 0.18, 0, g, 16);
-    const bulb = new Mesh(pendantBulbGeo, globeMaterial);
-    bulb.position.y = 0.115;
-    g.add(bulb);
-  };
-  [-1.6, ...windowTables].forEach((x, i) => pendantShade(x, 2.14, 0.85, (i - 1) * 0.9));
+  const domeAnchors = [1.95, 3.05, 4.15].map((z) => spot(raftX, raftY, z).add(ROOM_ORIGIN));
+  const pendantAnchors = [-1.6, ...windowTables].map((x) => spot(x, H, 0.85, globeMaterial).add(ROOM_ORIGIN));
 
   // fake contact shadows (area and point lights cast no shadows of their own)
   const shadowTex = contactShadowTexture();
@@ -716,7 +668,7 @@ export function buildRoom() {
   blob(1.3, cz1 - cz0 + 0.7, (cx0 + cx1) / 2 - 0.1, (cz0 + cz1) / 2, 0.7);
   blob(1.0, bz1 - bz0 + 0.5, (bx0 + bx1) / 2 - 0.1, (bz0 + bz1) / 2, 0.6);
 
-  const { curtainMaterial, sconceMaterial } = buildBack({ counter: { x0: cx0, x1: cx1, z0: cz0, z1: cz1, top: CT, gapX1: rx1 }, group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, pendantDome, TABLE_TOP });
+  const { curtainMaterial, sconceMaterial } = buildBack({ counter: { x0: cx0, x1: cx1, z0: cz0, z1: cz1, top: CT, gapX1: rx1 }, group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, ceilingSpot, TABLE_TOP });
 
   // --- lights ----------------------------------------------------------------------
   const sun = new DirectionalLight(0xffffff, 0);

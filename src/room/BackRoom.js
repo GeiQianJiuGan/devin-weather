@@ -12,7 +12,7 @@ import { artPrintTexture, linenTexture, chalkboardTexture, reededGlassTexture, s
 // `K` is the builder's kit of mesh helpers and shared materials.
 
 export function buildBack(K) {
-  const { group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, pendantDome, TABLE_TOP, counter } = K;
+  const { group, M, mat, box, rbox, slab, cyl, lathe, stick, v, chair, table, cup, blob, ceilingSpot, TABLE_TOP, counter } = K;
   const { w: W, d: D, h: H, glassNorth: GN, glassEast: GE } = ROOM;
   const rng = new Rng(77);
 
@@ -208,7 +208,7 @@ export function buildBack(K) {
   group.add(centrepiece);
   cup(sx - 0.62, 0.75, sz - 0.2, group, { rot: 1.1 });
   for (let k = 0; k < 3; k++) rbox(0.21, 0.006, 0.28, 0.002, k === 1 ? M.kraft : M.paper, sx + 0.72, 0.753 + k * 0.006, sz + 0.12).rotation.y = 0.2 + k * 0.17;
-  [-0.62, 0, 0.62].forEach((dx) => pendantDome(sx + dx, 2.02, sz));
+  [-0.62, 0, 0.62].forEach((dx) => ceilingSpot(sx + dx, sz));
 
   // --- bookcase and reading corner on the west wall -----------------------------------------
   const BW = 3.0;

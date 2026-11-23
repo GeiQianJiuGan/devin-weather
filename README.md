@@ -77,7 +77,7 @@ npm run preview   # 预览生产构建
 | Live weather | 实时模式开关、自动定位开关、城市搜索、精确定位 |
 | Weather | 10 种天气、强度、风力、窗外模糊 |
 | Time of day | 6 个时段、连续时间滑块、自动昼夜循环及速度 |
-| Scene | 玻璃雨滴、车流开关和密度、吊灯、菜单屏亮度 |
+| Scene | 玻璃雨滴、车流开关和密度、顶灯、菜单屏亮度 |
 | Playback and quality | 暂停、重置、全屏、画质、帧率 |
 | Scene configuration | 整个状态的 JSON，可复制、编辑、应用 |
 
@@ -112,7 +112,7 @@ src/
   city/StreetFurniture.js     路灯、红绿灯、路牌、树
   city/Vehicles.js            实例化车辆和车灯
   city/TrafficSystem.js       路线、信号灯、跟车、转弯
-  room/RoomBuilder.js         咖啡厅：吧台、桌椅、吊灯、绿植
+  room/RoomBuilder.js         咖啡厅：吧台、桌椅、射灯、绿植
   room/WindowGlass.js         玻璃：水珠、水痕、雾气、折射、反光
   systems/TimeSystem.js       时间 -> 日月位置和晴空光照
   systems/WeatherSystem.js    天气类型 x 强度 -> 平滑过渡的天气参数
