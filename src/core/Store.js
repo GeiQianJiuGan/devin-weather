@@ -116,6 +116,8 @@ export function sanitizeState(input) {
     const value = coerce(rule, raw);
     if (value !== undefined) writePath(state, path, value);
   }
+  // saved before automatic location existed: the place in it was chosen by hand
+  if (input.live && typeof input.live === 'object' && input.live.auto === undefined) state.live.auto = false;
   return state;
 }
 
