@@ -1,4 +1,5 @@
 import { QUALITY_LEVELS, TIME_PRESETS, WEATHER_TYPES, periodForHour } from '../core/Store.js';
+import { CITIES, searchCity } from '../systems/LiveWeather.js';
 import { formatHour } from '../core/utils.js';
 
 // Control panel. Every control is bound to one path of the central store:
@@ -18,7 +19,8 @@ function el(tag, props = {}, ...children) {
 }
 
 export class UIController {
-  constructor({ panel, root, stage, store, perf, toggleButton, toast }) {
+  constructor({ live, panel, root, stage, store, perf, toggleButton, toast }) {
+    this.live = live;
     this.panel = panel;
     this.root = root;
     this.stage = stage;
@@ -103,10 +105,57 @@ export class UIController {
       this.perfEl,
     );
 
+    const liveStatus = el('p', { class: 'live-status', role: 'status' });
+    const showStatus = (st) => {
+      liveStatus.textContent = st.text;
+      liveStatus.dataset.state = st.state;
+    };
+    this.live.onStatus = showStatus;
+    showStatus(this.live.status);
+    const cityChips = (list) => list.map((c) => el('button', {
+      type: 'button', class: 'chip', text: c.name, title: c.region || c.name, 'data-pos': `${c.lat},${c.lon}`, onclick: () => this.live.setCity(c),
+    }));
+    const results = el('div', { class: 'chips cities' }, ...cityChips(CITIES));
+    this.updaters.push(() => {
+      const l = store.get('live');
+      for (const chip of results.children) chip.setAttribute('aria-pressed', String(l.enabled && chip.dataset.pos === `${l.lat},${l.lon}`));
+    });
+    const cityInput = el('input', { type: 'text', class: 'text', placeholder: 'City, e.g. 成都', 'aria-label': 'City name', maxlength: '40' });
+    const search = async () => {
+      const name = cityInput.value.trim();
+      if (!name) return;
+      try {
+        const found = await searchCity(name);
+        if (!found.length) return this.toast(`No place found for "${name}"`);
+        results.replaceChildren(...cityChips(found));
+        this.live.setCity(found[0]);
+      } catch {
+        this.toast('City search is not reachable');
+      }
+    };
+    cityInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') search();
+    });
+    const locate = () => {
+      if (!navigator.geolocation) return this.toast('Location is not available in this browser');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => this.live.setCity({ name: 'My location', lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        () => this.toast('Location permission was not granted'),
+        { timeout: 10000 },
+      );
+    };
+    const live = this.section('Live weather',
+      this.toggle({ label: 'Follow real weather and local time', path: 'live.enabled' }),
+      el('div', { class: 'buttons search' }, cityInput, this.button('Search', search), this.button('Locate me', locate)),
+      results,
+      liveStatus,
+    );
+
     const weather = this.section('Weather',
       this.choices({
         options: WEATHER_TYPES, path: 'weather.type', className: 'weather',
         onPick: (option) => {
+          store.set('live.enabled', false);
           store.set('weather.type', option.id);
           store.set('weather.intensity', option.intensity);
         },
@@ -120,6 +169,7 @@ export class UIController {
       this.choices({
         options: TIME_PRESETS, path: 'time.preset', className: 'time',
         onPick: (option) => {
+          store.set('live.enabled', false);
           store.set('time.hour', option.hour);
           store.set('time.preset', option.id);
         },
@@ -127,6 +177,7 @@ export class UIController {
       this.slider({
         label: 'Time', path: 'time.hour', min: 0, max: 24, step: 0.05, format: formatHour,
         onInput: (v) => {
+          store.set('live.enabled', false);
           store.set('time.hour', v);
           store.set('time.preset', periodForHour(v));
         },
@@ -193,7 +244,7 @@ export class UIController {
     this.configDetails = config;
 
     const hint = el('p', { class: 'hint', text: 'Drag: look around   WASD / arrows: walk   Q/E: down/up   Wheel: zoom   R or double-click: reset view   Space: pause   H: hide panel   F: fullscreen' });
-    this.panel.append(head, weather, time, scene, playback, config, hint);
+    this.panel.append(head, live, weather, time, scene, playback, config, hint);
   }
 
   // --- behaviour ------------------------------------------------------------------------------

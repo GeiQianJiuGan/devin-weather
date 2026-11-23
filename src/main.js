@@ -2,6 +2,7 @@ import './style.css';
 import { App } from './core/App.js';
 import { PerformanceManager, suggestQuality } from './core/PerformanceManager.js';
 import { Store, QUALITY_LEVELS } from './core/Store.js';
+import { LiveWeather } from './systems/LiveWeather.js';
 import { UIController } from './ui/UIController.js';
 
 const $ = (id) => document.getElementById(id);
@@ -22,12 +23,13 @@ try {
       if (!forcedQuality && !store.hasSavedState) store.set('quality', suggestQuality(gpuName));
     },
   });
+  const live = new LiveWeather(store);
   const ui = new UIController({
-    panel: $('panel'), root: $('app'), stage: $('stage'), store, perf, toggleButton: $('panel-toggle'), toast: $('toast'),
+    live, panel: $('panel'), root: $('app'), stage: $('stage'), store, perf, toggleButton: $('panel-toggle'), toast: $('toast'),
   });
   app.onFirstFrame = () => loading.classList.add('done');
   app.start();
-  window.weatherSim = { app, store, ui, perf };
+  window.weatherSim = { app, store, ui, perf, live };
 } catch (error) {
   console.error(error);
   loading.classList.add('error');
