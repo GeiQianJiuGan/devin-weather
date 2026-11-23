@@ -2,7 +2,7 @@ import { LinearFilter, Vector2, WebGLRenderTarget } from 'three';
 import { BlurPyramid, HalfCopy } from './BlurPyramid.js';
 import { passMaterial } from './FullscreenPass.js';
 
-// Final grade: the bedroom (with the composited window view) is rendered into
+// Final grade: the cafe (with the composited window view) is rendered into
 // an HDR target, then bloomed, exposed, tone mapped and dithered to the screen.
 
 const FINAL_FRAG = /* glsl */ `

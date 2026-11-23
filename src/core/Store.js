@@ -1,7 +1,8 @@
 import { clamp } from './utils.js';
 
 // Central, serialisable scene configuration. Every system reads from this
-// store; the UI is the only writer (plus the auto day/night cycle).
+// store; the UI is the only writer (plus the auto day/night cycle
+// and live weather).
 
 export const WEATHER_TYPES = [
   { id: 'sunny', label: 'Sunny', intensity: 60 },
@@ -52,7 +53,14 @@ export function createDefaultState() {
       interiorLightEnabled: true,
       deskLampEnabled: true,
       computerScreenBrightness: 80,
+      // closing time: the cafe has switched its lights off, and what to switch back on at dawn
+      closedForNight: false,
+      resumeInteriorLight: true,
+      resumeDeskLamp: true,
+      resumeScreenBrightness: 80,
     },
+    // live mode: follow the current weather and local time of a real place
+    live: { enabled: false, city: '北京', lat: 39.9042, lon: 116.4074 },
     playback: { paused: false },
     quality: 'high',
   };
@@ -75,6 +83,14 @@ const SCHEMA = {
   'scene.interiorLightEnabled': bool,
   'scene.deskLampEnabled': bool,
   'scene.computerScreenBrightness': num(0, 100),
+  'scene.closedForNight': bool,
+  'scene.resumeInteriorLight': bool,
+  'scene.resumeDeskLamp': bool,
+  'scene.resumeScreenBrightness': num(0, 100),
+  'live.enabled': bool,
+  'live.city': { kind: 'string', max: 40 },
+  'live.lat': num(-90, 90),
+  'live.lon': num(-180, 180),
   'playback.paused': bool,
   quality: { kind: 'enum', values: QUALITY_LEVELS },
 };
@@ -92,6 +108,7 @@ function coerce(rule, value) {
     const n = Number(value);
     return Number.isFinite(n) ? clamp(n, rule.min, rule.max) : undefined;
   }
+  if (rule.kind === 'string') return typeof value === 'string' && value.trim() ? value.trim().slice(0, rule.max) : undefined;
   if (rule.kind === 'boolean') return typeof value === 'boolean' ? value : undefined;
   const v = rule.aliases && rule.aliases[value] ? rule.aliases[value] : value;
   return rule.values.includes(v) ? v : undefined;

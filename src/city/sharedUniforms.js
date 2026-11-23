@@ -11,10 +11,12 @@ export const ext = {
   uReflMatrix: { value: new Matrix4() },
   uReflOn: { value: 0 },
   uCityLights: { value: 0 },
+  uLate: { value: 0 }, // 1 in the small hours, when shops are shut and dark
   uWindowGain: { value: 1.6 },
   uSkyRefl: { value: new Color(0.3, 0.4, 0.5) },
   uHeadOn: { value: 0 },
   uTailOn: { value: 0 },
   uBlink: { value: 0 },
   uFogDensity: { value: 0.001 },
+  uWind: { value: 0.3 },
 };

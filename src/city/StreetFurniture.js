@@ -4,7 +4,6 @@ import {
   Color,
   CylinderGeometry,
   Group,
-  IcosahedronGeometry,
   InstancedMesh,
   Mesh,
   MeshBasicMaterial,
@@ -15,6 +14,7 @@ import {
 } from 'three';
 import { CURB_H, ROAD_HALF } from '../core/layout.js';
 import { DecalBatch } from './Decals.js';
+import { buildTrees } from './Trees.js';
 import { makeRoadSignTexture, makeSignTexture } from './signs.js';
 
 // Streetlights, traffic signals, road signs and street trees.
@@ -42,13 +42,13 @@ function streetlightLayout() {
   return out.sort((a, b) => a.dist - b.dist);
 }
 
-// Mast arms: one per approach, two heads each (far-side, except the southbound one).
+// Mast arms: one per approach on its own corner pole, two far-side heads each.
 // approach 0: eastbound, 1: northbound, 2: westbound, 3: southbound
 const MASTS = [
   { approach: 0, pole: [9.0, 9.4], arm: [0, -1], armLen: 8.7, heads: [[9.0, 5.25], [9.0, 1.75]], face: [-1, 0] },
   { approach: 1, pole: [9.4, -9.0], arm: [-1, 0], armLen: 8.7, heads: [[5.25, -9.0], [1.75, -9.0]], face: [0, 1] },
   { approach: 2, pole: [-9.2, -9.2], arm: [0, 1], armLen: 8.5, heads: [[-9.2, -5.25], [-9.2, -1.75]], face: [1, 0] },
-  { approach: 3, pole: [-9.2, -9.2], arm: [1, 0], armLen: 8.5, heads: [[-5.25, -9.2], [-1.75, -9.2]], face: [0, -1] },
+  { approach: 3, pole: [-9.2, 9.5], arm: [1, 0], armLen: 8.5, heads: [[-5.25, 9.5], [-1.75, 9.5]], face: [0, -1] },
 ];
 const MAST_H = 7.3;
 const HEAD_Y = 6.55;
@@ -200,31 +200,7 @@ export function buildStreetFurniture(rng, realLightCount) {
     [28, -9.2], [44, -9.3], [61, -9.1], [-27, -9.2], [-44, -9.3], [9.2, -31], [9.3, -47], [9.1, -63],
     [-9.2, -33], [-9.3, -52], [27, 9.2], [45, 9.3], [9.2, 30], [9.3, 47], [-9.2, 34], [-30, 9.3], [-48, 9.2],
   ];
-  const trunkGeo = new CylinderGeometry(0.1, 0.16, 3.2, 6);
-  trunkGeo.translate(0, 1.6, 0);
-  const trunks = new InstancedMesh(trunkGeo, new MeshStandardMaterial({ color: 0x2c2118, roughness: 0.9 }), treeSpots.length);
-  const crowns = new InstancedMesh(
-    new IcosahedronGeometry(1, 1),
-    new MeshStandardMaterial({ color: 0x2f4a26, roughness: 0.95, flatShading: true }),
-    treeSpots.length * 3,
-  );
-  treeSpots.forEach(([x, z], i) => {
-    const s = rng.range(0.85, 1.25);
-    place(trunks, i, x, CURB_H, z, rng.range(0, 3), s, s, s);
-    for (let k = 0; k < 3; k++) {
-      const r = rng.range(1.1, 1.7) * s;
-      place(
-        crowns, i * 3 + k,
-        x + rng.range(-0.8, 0.8) * s, CURB_H + (3.4 + k * 0.9 + rng.range(-0.2, 0.2)) * s, z + rng.range(-0.8, 0.8) * s,
-        rng.range(0, 3), r, r * rng.range(0.75, 0.95), r,
-      );
-    }
-  });
-  trunks.castShadow = true;
-  crowns.castShadow = true;
-  trunks.frustumCulled = false;
-  crowns.frustumCulled = false;
-  group.add(trunks, crowns);
+  group.add(buildTrees(rng, treeSpots));
 
   return {
     group,

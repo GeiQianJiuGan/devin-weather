@@ -1,7 +1,7 @@
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from 'three';
 import { Rng } from '../core/utils.js';
 
-// Procedural canvas textures for the bedroom (no image files).
+// Procedural canvas textures for the cafe interior (no image files).
 
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   // very old browsers: fall back to square corners
@@ -20,125 +20,205 @@ function canvas(width, height) {
 function toTexture(c, repeat = false) {
   const texture = new CanvasTexture(c);
   texture.colorSpace = SRGBColorSpace;
-  texture.anisotropy = 8;
+  texture.anisotropy = 16;
   if (repeat) texture.wrapS = texture.wrapT = RepeatWrapping;
   return texture;
 }
 
-/** Oak planks; one tile covers 1.6 m x 1.6 m (8 planks). */
+/** Oiled oak planks; one tile covers 2 m x 2 m (14 rows of 143 mm boards). */
 export function woodFloorTexture() {
-  const [c, g] = canvas(1024, 1024);
+  const S = 2048;
+  const [c, g] = canvas(S, S);
   const rng = new Rng(11);
-  const rows = 8;
-  const ph = 1024 / rows;
+  const rows = 14;
+  const ph = S / rows;
   for (let r = 0; r < rows; r++) {
-    let x = -rng.range(0, 400);
-    while (x < 1024) {
-      const w = rng.range(380, 720);
-      const light = rng.range(-10, 10);
-      g.fillStyle = `rgb(${150 + light}, ${112 + light * 0.8}, ${78 + light * 0.6})`;
+    let x = -rng.range(0, 900);
+    while (x < S) {
+      const w = rng.range(900, 1500);
+      const light = rng.range(-14, 12);
+      const warm = rng.range(-4, 4);
+      g.fillStyle = `rgb(${172 + light + warm}, ${136 + light * 0.85}, ${98 + light * 0.65 - warm})`;
       g.fillRect(x, r * ph, w, ph);
-      for (let k = 0; k < 26; k++) {
-        const y = r * ph + rng.range(2, ph - 2);
-        g.strokeStyle = `rgba(${rng.chance(0.5) ? '70, 45, 25' : '205, 170, 130'}, ${rng.range(0.04, 0.13)})`;
-        g.lineWidth = rng.range(0.6, 1.8);
+      // long grain
+      for (let k = 0; k < 90; k++) {
+        const y = r * ph + rng.range(1, ph - 1);
+        g.strokeStyle = `rgba(${rng.chance(0.55) ? '84, 54, 28' : '226, 196, 156'}, ${rng.range(0.03, 0.12)})`;
+        g.lineWidth = rng.range(0.5, 2.2);
         g.beginPath();
         g.moveTo(x, y);
-        g.bezierCurveTo(x + w * 0.3, y + rng.range(-3, 3), x + w * 0.7, y + rng.range(-3, 3), x + w, y + rng.range(-2, 2));
+        g.bezierCurveTo(x + w * 0.3, y + rng.range(-5, 5), x + w * 0.7, y + rng.range(-5, 5), x + w, y + rng.range(-3, 3));
         g.stroke();
       }
-      g.fillStyle = 'rgba(40, 24, 12, 0.5)';
-      g.fillRect(x + w - 1.5, r * ph, 2.5, ph);
+      // cathedral figure and the odd knot
+      if (rng.chance(0.55)) {
+        const cx = x + rng.range(0.2, 0.8) * w;
+        const cy = r * ph + rng.range(0.3, 0.7) * ph;
+        for (let k = 1; k < 7; k++) {
+          g.strokeStyle = `rgba(92, 58, 30, ${0.1 - k * 0.01})`;
+          g.lineWidth = 1.4;
+          g.beginPath();
+          g.ellipse(cx, cy, k * 46, k * 5.5, 0, 0, Math.PI * 2);
+          g.stroke();
+        }
+        if (rng.chance(0.3)) {
+          g.fillStyle = 'rgba(70, 42, 22, 0.5)';
+          g.beginPath();
+          g.ellipse(cx, cy, 9, 6, 0, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+      // fine pores
+      for (let k = 0; k < 500; k++) {
+        g.fillStyle = `rgba(60, 38, 20, ${rng.range(0.05, 0.16)})`;
+        g.fillRect(x + rng.range(0, w), r * ph + rng.range(0, ph), rng.range(4, 16), 1);
+      }
+      g.fillStyle = 'rgba(38, 22, 10, 0.6)';
+      g.fillRect(x + w - 1.5, r * ph, 3, ph);
       x += w;
     }
-    g.fillStyle = 'rgba(40, 24, 12, 0.55)';
-    g.fillRect(0, r * ph, 1024, 2);
+    g.fillStyle = 'rgba(38, 22, 10, 0.6)';
+    g.fillRect(0, r * ph, S, 2.5);
+    g.fillStyle = 'rgba(255, 236, 205, 0.1)';
+    g.fillRect(0, r * ph + 2.5, S, 1.5);
   }
   return toTexture(c, true);
 }
 
-export function rugTexture() {
-  const [c, g] = canvas(512, 352);
-  const rng = new Rng(5);
-  g.fillStyle = '#b9ad9c';
-  g.fillRect(0, 0, 512, 352);
-  for (let i = 0; i < 9000; i++) {
-    g.fillStyle = `rgba(${rng.chance(0.5) ? '255, 250, 240' : '80, 70, 60'}, ${rng.range(0.03, 0.1)})`;
-    g.fillRect(rng.range(0, 512), rng.range(0, 352), rng.range(1, 4), 1);
-  }
-  g.strokeStyle = 'rgba(84, 92, 104, 0.85)';
-  g.lineWidth = 6;
-  g.strokeRect(22, 22, 468, 308);
-  g.lineWidth = 2;
-  g.strokeRect(36, 36, 440, 280);
-  g.strokeStyle = 'rgba(160, 96, 66, 0.7)';
-  for (let x = 70; x < 460; x += 44) {
+/** Straight-grained timber (walnut, oak ...) with the grain running along V. */
+export function woodGrainTexture(rgb, seed = 1) {
+  const S = 1024;
+  const [c, g] = canvas(S, S);
+  const rng = new Rng(seed);
+  g.fillStyle = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+  g.fillRect(0, 0, S, S);
+  for (let k = 0; k < 420; k++) {
+    const x = rng.range(0, S);
+    const dark = rng.chance(0.6);
+    g.strokeStyle = dark
+      ? `rgba(${rgb[0] * 0.45}, ${rgb[1] * 0.42}, ${rgb[2] * 0.4}, ${rng.range(0.05, 0.22)})`
+      : `rgba(${Math.min(255, rgb[0] * 1.35)}, ${Math.min(255, rgb[1] * 1.3)}, ${Math.min(255, rgb[2] * 1.25)}, ${rng.range(0.04, 0.14)})`;
+    g.lineWidth = rng.range(0.6, 3.2);
     g.beginPath();
-    g.moveTo(x, 150);
-    g.lineTo(x + 22, 176);
-    g.lineTo(x + 44, 150);
-    g.lineTo(x + 22, 202);
-    g.closePath();
+    g.moveTo(x, 0);
+    g.bezierCurveTo(x + rng.range(-14, 14), S * 0.33, x + rng.range(-14, 14), S * 0.66, x + rng.range(-6, 6), S);
     g.stroke();
   }
-  return toTexture(c);
-}
-
-/** Portrait key layout: rows run along the canvas height. */
-export function keyboardTexture() {
-  const [c, g] = canvas(160, 512);
-  g.fillStyle = '#1b1d21';
-  g.fillRect(0, 0, 160, 512);
-  const rows = 5;
-  const cols = 15;
-  const kw = 136 / rows;
-  const kh = 496 / cols;
-  for (let r = 0; r < rows; r++) {
-    for (let k = 0; k < cols; k++) {
-      const wide = r === 0 && k > 4 && k < 10; // space bar
-      if (wide && k !== 5) continue;
-      g.fillStyle = (r + k) % 7 === 0 ? '#3a3f47' : '#2b2f36';
-      const h = wide ? kh * 5 - 3 : kh - 3;
-      g.beginPath();
-      g.roundRect(12 + r * kw + 1.5, 8 + k * kh + 1.5, kw - 3, h, 3);
-      g.fill();
-    }
+  for (let k = 0; k < 2600; k++) {
+    g.fillStyle = `rgba(${rgb[0] * 0.35}, ${rgb[1] * 0.33}, ${rgb[2] * 0.3}, ${rng.range(0.06, 0.2)})`;
+    g.fillRect(rng.range(0, S), rng.range(0, S), 1, rng.range(5, 22));
   }
-  return toTexture(c);
+  return toTexture(c, true);
 }
 
-export function paperTexture(seed) {
-  const [c, g] = canvas(256, 362);
+/** Honed white marble with soft grey and faint gold veining; tiles seamlessly enough at 1.2 m. */
+export function marbleTexture(seed = 5) {
+  const S = 1024;
+  const [c, g] = canvas(S, S);
   const rng = new Rng(seed);
-  g.fillStyle = rng.chance(0.3) ? '#f4f0e6' : '#f7f7f5';
-  g.fillRect(0, 0, 256, 362);
-  g.fillStyle = 'rgba(40, 44, 52, 0.85)';
-  g.fillRect(26, 28, rng.range(90, 150), 9);
-  g.fillStyle = 'rgba(70, 76, 88, 0.5)';
-  let y = 56;
-  while (y < 330) {
-    if (rng.chance(0.12)) {
-      y += 12;
-      continue;
-    }
-    if (rng.chance(0.08) && y < 250) {
-      g.strokeStyle = 'rgba(60, 100, 170, 0.6)';
-      g.lineWidth = 1.5;
-      g.strokeRect(30, y, 196, 54);
-      g.beginPath();
-      g.moveTo(34, y + 44);
-      for (let x = 34; x < 224; x += 16) g.lineTo(x, y + 44 - rng.range(4, 38));
-      g.stroke();
-      y += 66;
-      continue;
-    }
-    g.fillRect(26, y, rng.range(120, 204), 3.2);
-    y += 9;
+  g.fillStyle = '#eeebe6';
+  g.fillRect(0, 0, S, S);
+  // cloudy body
+  for (let k = 0; k < 70; k++) {
+    const x = rng.range(0, S);
+    const y = rng.range(0, S);
+    const r = rng.range(60, 220);
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    const tone = rng.chance(0.5) ? '150, 152, 158' : '255, 255, 255';
+    grad.addColorStop(0, `rgba(${tone}, ${rng.range(0.05, 0.14)})`);
+    grad.addColorStop(1, `rgba(${tone}, 0)`);
+    g.fillStyle = grad;
+    g.fillRect(x - r, y - r, 2 * r, 2 * r);
   }
+  // veins: wandering strokes that fork
+  const vein = (x, y, angle, width, alpha, steps) => {
+    for (let i = 0; i < steps; i++) {
+      const nx = x + Math.cos(angle) * 16;
+      const ny = y + Math.sin(angle) * 16;
+      g.strokeStyle = `rgba(96, 98, 106, ${alpha})`;
+      g.lineWidth = width * rng.range(0.6, 1.3);
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(nx, ny);
+      g.stroke();
+      x = nx;
+      y = ny;
+      angle += rng.range(-0.38, 0.38);
+      if (width > 1 && rng.chance(0.06)) vein(x, y, angle + rng.range(-0.9, 0.9), width * 0.5, alpha * 0.8, steps >> 1);
+    }
+  };
+  g.lineCap = 'round';
+  g.shadowColor = 'rgba(90, 92, 100, 0.5)';
+  for (let k = 0; k < 9; k++) {
+    g.shadowBlur = rng.range(3, 12);
+    vein(rng.range(-50, S), rng.range(-50, S), rng.range(0.3, 1.1), rng.range(1, 4.5), rng.range(0.12, 0.34), 90);
+  }
+  g.shadowBlur = 0;
+  for (let k = 0; k < 14; k++) {
+    g.strokeStyle = `rgba(176, 140, 84, ${rng.range(0.05, 0.14)})`;
+    g.lineWidth = rng.range(0.6, 1.4);
+    let x = rng.range(0, S);
+    let y = rng.range(0, S);
+    let a = rng.range(0.3, 1.1);
+    g.beginPath();
+    g.moveTo(x, y);
+    for (let i = 0; i < 30; i++) {
+      x += Math.cos(a) * 14;
+      y += Math.sin(a) * 14;
+      a += rng.range(-0.4, 0.4);
+      g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  return toTexture(c, true);
+}
+
+/** Top view of a flat white: crema with a poured rosetta. */
+export function latteTexture() {
+  const S = 256;
+  const [c, g] = canvas(S, S);
+  const crema = g.createRadialGradient(S / 2, S / 2, 10, S / 2, S / 2, S / 2);
+  crema.addColorStop(0, '#b9834f');
+  crema.addColorStop(0.8, '#a06a3a');
+  crema.addColorStop(1, '#6e431f');
+  g.fillStyle = crema;
+  g.fillRect(0, 0, S, S);
+  g.strokeStyle = '#f3e6d2';
+  g.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    const y = 70 + i * 22;
+    const w = 58 - Math.abs(i - 2.2) * 9;
+    g.lineWidth = 9;
+    g.beginPath();
+    g.moveTo(S / 2 - w, y - 12);
+    g.quadraticCurveTo(S / 2, y + 22, S / 2 + w, y - 12);
+    g.stroke();
+  }
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(S / 2, 50);
+  g.lineTo(S / 2, 206);
+  g.stroke();
   return toTexture(c);
 }
 
-/** Soft rounded-rectangle alpha falloff used for fake contact shadows. */
+/** Embroidered linen for seat pads and the like: a fine two-tone weave. */
+export function linenTexture(rgb) {
+  const S = 512;
+  const [c, g] = canvas(S, S);
+  const rng = new Rng(17);
+  g.fillStyle = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+  g.fillRect(0, 0, S, S);
+  for (let y = 0; y < S; y += 4) {
+    for (let x = 0; x < S; x += 4) {
+      const v = rng.range(-16, 16);
+      g.fillStyle = v > 0 ? `rgba(255, 255, 255, ${v / 160})` : `rgba(0, 0, 0, ${-v / 130})`;
+      g.fillRect(x, y, ((x + y) >> 2) % 2 ? 4 : 2, ((x + y) >> 2) % 2 ? 2 : 4);
+    }
+  }
+  return toTexture(c, true);
+}
+
 export function contactShadowTexture() {
   const [c, g] = canvas(128, 128);
   const img = g.createImageData(128, 128);
@@ -159,22 +239,17 @@ export function contactShadowTexture() {
   return texture;
 }
 
-/** Animated desktop shown on the monitor: code editor, a small chart and a clock. */
+/** The menu display on the counter: today's coffee list and a clock. */
 export class ScreenContent {
   constructor() {
-    [this.canvas, this.g] = canvas(640, 360);
+    [this.canvas, this.g] = canvas(960, 540);
     this.texture = toTexture(this.canvas);
     this.key = '';
-    this.rng = new Rng(3);
-    this.lines = Array.from({ length: 60 }, () => ({
-      indent: this.rng.int(0, 3),
-      parts: Array.from({ length: this.rng.int(1, 4) }, () => ({ w: this.rng.range(18, 90), c: this.rng.int(0, 4) })),
-    }));
     this.update('22:00', 0);
   }
 
   update(clock, time) {
-    const tick = Math.floor(time * 2);
+    const tick = Math.floor(time / 4) % 3;
     const key = `${clock}|${tick}`;
     if (key === this.key) return;
     this.key = key;
@@ -184,88 +259,51 @@ export class ScreenContent {
 
   draw(clock, tick) {
     const g = this.g;
-    const bg = g.createLinearGradient(0, 0, 640, 360);
-    bg.addColorStop(0, '#0d2a55');
-    bg.addColorStop(0.55, '#1b4f8f');
-    bg.addColorStop(1, '#3f8fc4');
-    g.fillStyle = bg;
-    g.fillRect(0, 0, 640, 360);
-
-    // editor window
-    g.fillStyle = '#12161f';
-    g.beginPath();
-    g.roundRect(22, 18, 388, 296, 8);
-    g.fill();
-    g.fillStyle = '#1c2230';
-    g.beginPath();
-    g.roundRect(22, 18, 388, 24, [8, 8, 0, 0]);
-    g.fill();
-    ['#ff6058', '#ffbd2e', '#28c940'].forEach((col, i) => {
-      g.fillStyle = col;
-      g.beginPath();
-      g.arc(38 + i * 16, 30, 4.5, 0, Math.PI * 2);
-      g.fill();
-    });
-    g.fillStyle = '#171c27';
-    g.fillRect(22, 42, 70, 272);
-    const palette = ['#7fb6ff', '#c7d3e6', '#7fe3c4', '#f0c674', '#d59cff'];
-    const scroll = Math.floor(tick / 6) % 30;
-    for (let i = 0; i < 20; i++) {
-      const line = this.lines[(i + scroll) % this.lines.length];
-      const y = 54 + i * 12.6;
-      g.fillStyle = '#3a445a';
-      g.fillRect(100, y, 10, 4);
-      let x = 122 + line.indent * 16;
-      for (const part of line.parts) {
-        g.fillStyle = palette[part.c];
-        g.fillRect(x, y, part.w, 4.5);
-        x += part.w + 8;
-      }
-      if (i < 9) {
-        g.fillStyle = i === 3 ? '#7fb6ff' : '#34405a';
-        g.fillRect(32, y, 30 + ((i * 17) % 22), 4);
-      }
-    }
-    if (tick % 2 === 0) {
-      g.fillStyle = '#ffffff';
-      g.fillRect(126 + ((tick * 7) % 150), 54 + 12.6 * 11 - 3, 2, 11);
-    }
-
-    // chart widget
-    g.fillStyle = 'rgba(240, 247, 255, 0.92)';
-    g.beginPath();
-    g.roundRect(428, 18, 190, 138, 8);
-    g.fill();
-    g.fillStyle = '#28446e';
-    g.fillRect(442, 30, 72, 6);
-    for (let i = 0; i < 9; i++) {
-      const h = 22 + 58 * Math.abs(Math.sin(i * 1.7 + tick * 0.15));
-      g.fillStyle = i % 3 === 0 ? '#2f7fe0' : '#7db6f2';
-      g.fillRect(444 + i * 19, 142 - h, 12, h);
-    }
-    // notes widget
-    g.fillStyle = 'rgba(16, 24, 40, 0.82)';
-    g.beginPath();
-    g.roundRect(428, 170, 190, 144, 8);
-    g.fill();
-    g.fillStyle = '#9fd0ff';
-    g.fillRect(442, 184, 90, 6);
-    g.fillStyle = '#56688a';
-    for (let i = 0; i < 7; i++) g.fillRect(442, 204 + i * 14, 80 + ((i * 37) % 80), 4);
-
-    // taskbar
-    g.fillStyle = 'rgba(8, 14, 26, 0.86)';
-    g.fillRect(0, 328, 640, 32);
-    for (let i = 0; i < 7; i++) {
-      g.fillStyle = ['#4aa3ff', '#ffffff', '#58d6a9', '#ffc857', '#ff7b72', '#c792ea', '#9fb3c8'][i];
-      g.beginPath();
-      g.roundRect(18 + i * 30, 336, 16, 16, 4);
-      g.fill();
-    }
-    g.fillStyle = '#eaf2ff';
-    g.font = '600 15px "Segoe UI", Arial, sans-serif';
+    g.fillStyle = '#15120f';
+    g.fillRect(0, 0, 960, 540);
+    g.textBaseline = 'alphabetic';
+    g.textAlign = 'left';
+    g.fillStyle = '#f2e7d5';
+    g.font = '600 46px Georgia, "Times New Roman", serif';
+    g.fillText('Corner House Coffee', 48, 78);
+    g.fillStyle = '#c9a26a';
+    g.font = '500 20px "Segoe UI", Arial, sans-serif';
+    g.fillText('SECOND FLOOR  ·  OPEN DAILY', 50, 112);
     g.textAlign = 'right';
-    g.textBaseline = 'middle';
-    g.fillText(clock, 624, 345);
+    g.fillStyle = '#f2e7d5';
+    g.font = '300 44px "Segoe UI", Arial, sans-serif';
+    g.fillText(clock, 912, 80);
+    g.fillStyle = '#c9a26a';
+    g.fillRect(48, 132, 864, 2);
+
+    const columns = [
+      ['COFFEE', [['Espresso', '3.0'], ['Americano', '3.5'], ['Flat White', '4.2'], ['Cappuccino', '4.2'], ['Latte', '4.5'], ['Mocha', '4.8']]],
+      ['SLOW BAR', [['Hand Drip', '5.5'], ['Cold Brew', '4.8'], ['Matcha Latte', '5.0'], ['Earl Grey', '3.8'], ['Croissant', '3.2'], ['Lemon Cake', '4.0']]],
+    ];
+    columns.forEach(([title, rows], ci) => {
+      const x0 = 48 + ci * 450;
+      g.textAlign = 'left';
+      g.fillStyle = '#c9a26a';
+      g.font = '600 22px "Segoe UI", Arial, sans-serif';
+      g.fillText(title, x0, 180);
+      rows.forEach(([name, price], i) => {
+        const y = 226 + i * 46;
+        const featured = ci * 6 + i === [2, 6, 4][tick];
+        g.textAlign = 'left';
+        g.fillStyle = featured ? '#ffd9a0' : '#e9dfcf';
+        g.font = '400 30px Georgia, "Times New Roman", serif';
+        g.fillText(name, x0, y);
+        const nameW = g.measureText(name).width;
+        g.textAlign = 'right';
+        g.font = '400 28px "Segoe UI", Arial, sans-serif';
+        g.fillText(price, x0 + 400, y);
+        g.fillStyle = 'rgba(201, 162, 106, 0.4)';
+        for (let x = x0 + nameW + 14; x < x0 + 400 - 56; x += 9) g.fillRect(x, y - 4, 2, 2);
+      });
+    });
+    g.textAlign = 'left';
+    g.fillStyle = '#8f8676';
+    g.font = '400 18px "Segoe UI", Arial, sans-serif';
+    g.fillText('Oat and soy milk available  ·  Please order at the counter', 48, 512);
   }
 }

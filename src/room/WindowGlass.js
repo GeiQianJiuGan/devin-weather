@@ -19,7 +19,10 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
+const GLINTS = 8;
+
 const FRAG = /* glsl */ `
+#define GLINTS ${GLINTS}
 uniform sampler2D tScene;
 uniform sampler2D tMist;
 uniform sampler2D tHalo;
@@ -33,9 +36,9 @@ uniform float uMistOn;
 uniform float uTilt;
 uniform vec3 uVeil;
 uniform vec3 uInterior;
-uniform vec3 uGlintPos[2];
-uniform vec3 uGlintColor[2];
-uniform float uGlintSize[2];
+uniform vec3 uGlintPos[GLINTS];
+uniform vec3 uGlintColor[GLINTS];
+uniform float uGlintSize[GLINTS];
 varying vec2 vGuv;
 varying vec3 vWorldPos;
 varying vec3 vWorldNormal;
@@ -63,18 +66,25 @@ float vnoise(vec2 p) {
   return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
-// Small beads that sit on the glass, slowly grow and vanish again.
-float beads(vec2 uv, float cell, float t, float amount) {
-  vec2 g = uv / cell;
+// Small beads that sit on the glass, slowly grow and vanish again. The lattice is hidden by
+// warping the lookup (w), scattering each bead across its whole cell and giving the radii a
+// long-tailed distribution: mostly specks, now and then a fat drop that is not quite round.
+float beads(vec2 uv, vec2 w, float cell, float t, float amount) {
+  vec2 g = (uv + w * cell * 1.6) / cell;
   vec2 id = floor(g);
   vec2 f = fract(g) - 0.5;
   vec3 r = h32(id);
+  vec3 q = h32(id + 71.7);
   float on = step(1.0 - amount, r.z);
   float life = fract(t * 0.035 * (0.6 + r.x) + r.y * 9.0);
   float grow = smoothstep(0.0, 0.15, life) * (1.0 - smoothstep(0.85, 1.0, life));
-  float rad = (0.12 + 0.16 * fract(r.z * 17.3)) * grow + 1e-4;
-  vec2 c = (r.xy - 0.5) * 0.4;
-  return on * (1.0 - smoothstep(rad * 0.35, rad, length(f - c)));
+  float rad = (0.07 + 0.19 * q.x * q.x) * grow + 1e-4;
+  vec2 d = f - (r.xy - 0.5) * (0.98 - 2.0 * rad);
+  float ca = cos(q.y * 6.2832);
+  float sa = sin(q.y * 6.2832);
+  d = vec2(ca * d.x - sa * d.y, sa * d.x + ca * d.y);
+  d.x *= 1.0 + 0.45 * q.z;
+  return on * (1.0 - smoothstep(rad * 0.35, rad, length(d)));
 }
 
 // Drops that run down the pane in stick-slip motion, leaving a wet trail.
@@ -92,10 +102,10 @@ vec2 slide(vec2 uv, float t, vec2 cell, float seed, float amount) {
   float fy = fract(y);
   float ph = fract(t * speed / 0.706 + r.y);
   float py = ph < 0.85 ? mix(0.2, 0.8, ph / 0.85) : mix(0.8, 0.2, smoothstep(0.0, 1.0, (ph - 0.85) / 0.15));
-  float px = (r.x - 0.5) * 0.4;
+  float px = (r.x - 0.5) * 0.62;
   px += (sin(uv.y * 31.0 + r.y * 6.28) * 0.07 + sin(uv.y * 77.0 + cr.z * 6.28) * 0.03) * (0.5 - abs(px));
   vec2 d = vec2((fx - px) * cell.x, (fy - py) * cell.y);
-  float R = cell.x * (0.16 + 0.1 * r.z);
+  float R = cell.x * (0.1 + 0.16 * r.z * r.z);
   vec2 dd = d;
   dd.y *= d.y > 0.0 ? 0.72 : 1.0;
   float h = 1.0 - smoothstep(R * 0.35, R, length(dd));
@@ -109,12 +119,19 @@ vec2 slide(vec2 uv, float t, vec2 cell, float seed, float amount) {
   return vec2(max(h, residue * 0.7), trail) * alive;
 }
 
+// Sizes are in metres on the pane: beads of 2-10 mm across, running drops of about a centimetre.
 vec2 dropField(vec2 uv) {
+  vec2 w = vec2(vnoise(uv * 19.0), vnoise(uv * 19.0 + 31.7)) - 0.5;
   // beads are kept shallow: they only bend the view a little instead of turning into noise
-  float b = beads(uv, 0.032, uTime, clamp(uDrops * 1.5, 0.0, 0.85)) * 0.3;
-  vec2 a = slide(uv, uTime, vec2(0.1, 0.42), 1.0, clamp(uDrops * 1.2 - 0.1, 0.0, 0.85));
+  float b = beads(uv, w, 0.015, uTime, clamp(uDrops * 1.1, 0.0, 0.5)) * 0.24;
+  b = max(b, beads(uv + vec2(0.413, 0.257), w.yx, 0.026, uTime * 0.8, clamp(uDrops * 1.0, 0.0, 0.5)) * 0.32);
+  // runs wander instead of falling down ruled columns
+  vec2 su = uv;
+  su.x += (vnoise(vec2(uv.x * 2.3, uv.y * 1.7)) - 0.5) * 0.07 + w.x * 0.004;
+  vec2 a = slide(su, uTime, vec2(0.052, 0.5), 1.0, clamp(uDrops * 0.9 - 0.08, 0.0, 0.6));
   #ifdef SECOND_LAYER
-    vec2 c = slide(uv + vec2(0.37, 0.11), uTime * 1.15, vec2(0.064, 0.3), 7.0, clamp(uDrops * 1.5 - 0.5, 0.0, 0.8));
+    b = max(b, beads(uv + vec2(0.171, 0.633), -w, 0.04, uTime * 0.6, clamp(uDrops * 0.7 - 0.1, 0.0, 0.35)) * 0.38);
+    vec2 c = slide(su + vec2(0.37, 0.11) + w * 0.006, uTime * 1.15, vec2(0.031, 0.37), 7.0, clamp(uDrops * 0.9 - 0.3, 0.0, 0.45));
     a = max(a, c);
   #endif
   return vec2(max(a.x, b * (1.0 - a.y)), a.y);
@@ -137,7 +154,7 @@ void main() {
       // screen-space derivatives: one evaluation of the drop field instead of three
       grad = vec2(dFdx(c0.x), dFdy(c0.x)) * 0.5;
     #else
-      const float e = 0.0016;
+      const float e = 0.0008;
       grad = vec2(dropField(guv + vec2(e, 0.0)).x - c0.x, dropField(guv + vec2(0.0, e)).x - c0.x);
     #endif
     drop = c0.x;
@@ -145,10 +162,10 @@ void main() {
   }
 
   float mistAmt = uMist * (0.62 + 0.38 * vnoise(vGuv * 2.3)) * (1.0 - 0.85 * clamp(wipe, 0.0, 1.0));
-  float inDrop = smoothstep(0.06, 0.28, drop);
+  float inDrop = smoothstep(0.05, 0.22, drop);
   float blurAmt = clamp(uBlur + mistAmt, 0.0, 0.9) * (1.0 - inDrop);
 
-  vec2 offs = grad * 0.22;
+  vec2 offs = grad * 0.3;
   offs.x *= uResolution.y / uResolution.x;
   vec2 uvS = clamp(suv + offs, vec2(0.001), vec2(0.999));
   vec3 sharp = texture2D(tScene, uvS).rgb;
@@ -164,7 +181,7 @@ void main() {
 
   // drop shading: darker rim, small highlight
   float rim = smoothstep(0.0, 0.25, drop) * (1.0 - smoothstep(0.25, 0.8, drop));
-  col *= 1.0 - 0.14 * rim;
+  col *= 1.0 - 0.07 * rim;
   vec3 dn = normalize(vec3(-grad * 3.0, 1.0));
   float spec = pow(max(dot(dn, normalize(vec3(-0.4, 0.7, 0.6))), 0.0), 40.0) * inDrop;
   col += (uVeil * 2.0 + uInterior * 2.0) * spec;
@@ -174,11 +191,20 @@ void main() {
   float fres = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
   col = mix(col, uInterior, min(fres, 0.6));
   vec3 R = reflect(-V, N);
-  for (int i = 0; i < 2; i++) {
+  // Mirror images of the room's lamps. Each is a small, fairly crisp spot the size of the
+  // bulb with a faint skirt, plus a weaker second image from the back face of the pane -
+  // not a big soft blob.
+  vec3 R2 = normalize(R + N * 0.012);
+  for (int i = 0; i < GLINTS; i++) {
     vec3 toL = uGlintPos[i] - vWorldPos;
-    float t = max(dot(toL, R), 0.0);
-    vec3 miss = toL - R * t;
-    col += uGlintColor[i] * exp(-dot(miss, miss) / (uGlintSize[i] * uGlintSize[i])) * fres;
+    float s2 = uGlintSize[i] * uGlintSize[i];
+    vec3 miss = toL - R * max(dot(toL, R), 0.0);
+    float q = dot(miss, miss) / s2;
+    float img = exp(-q * q) + 0.06 * exp(-q * 0.06);
+    vec3 miss2 = toL - R2 * max(dot(toL, R2), 0.0);
+    float q2 = dot(miss2, miss2) / s2;
+    img += 0.35 * exp(-q2 * q2);
+    col += uGlintColor[i] * img * min(fres, 0.5);
   }
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -199,9 +225,10 @@ export class WindowGlass {
       uTilt: { value: 0 },
       uVeil: { value: new Color(0.5, 0.55, 0.6) },
       uInterior: { value: new Color(0.02, 0.02, 0.02) },
-      uGlintPos: { value: [new Vector3(), new Vector3()] },
-      uGlintColor: { value: [new Color(0, 0, 0), new Color(0, 0, 0)] },
-      uGlintSize: { value: [0.22, 0.07] },
+      uGlintPos: { value: Array.from({ length: GLINTS }, () => new Vector3()) },
+      uGlintColor: { value: Array.from({ length: GLINTS }, () => new Color(0, 0, 0)) },
+      // menu display, table lamp, then the pendant shades
+      uGlintSize: { value: [0.2, 0.045, 0.04, 0.04, 0.04, 0.045, 0.045, 0.045] },
     };
     this.material = new ShaderMaterial({
       vertexShader: VERT,

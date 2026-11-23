@@ -1,6 +1,7 @@
 import {
   HalfFloatType,
   NoToneMapping,
+  PMREMGenerator,
   PCFShadowMap,
   PerspectiveCamera,
   Scene,
@@ -16,15 +17,18 @@ import { VehicleFleet } from '../city/Vehicles.js';
 import { ExteriorPipeline } from '../render/ExteriorPipeline.js';
 import { FullscreenPass } from '../render/FullscreenPass.js';
 import { PostFX } from '../render/PostFX.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildRoom } from '../room/RoomBuilder.js';
 import { WindowGlass } from '../room/WindowGlass.js';
 import { SkyDome } from '../sky/SkyDome.js';
-import { LightingSystem } from '../systems/LightingSystem.js';
+import { LightingSystem, lateness } from '../systems/LightingSystem.js';
 import { TimeSystem } from '../systems/TimeSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
 import { LightningSystem } from '../weather/LightningSystem.js';
 import { RainSystem, SnowSystem } from '../weather/Precipitation.js';
-import { CAMERA, ROOM_ORIGIN } from './layout.js';
+import { CAMERA, ROOM, ROOM_ORIGIN } from './layout.js';
+
+const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 import { QUALITY } from './PerformanceManager.js';
 import { Rng, clamp, damp, formatHour } from './utils.js';
 
@@ -33,11 +37,11 @@ const VEHICLE_POOL = 64;
 const BASE_ASPECT = 16 / 9;
 
 /**
- * Scene manager: owns the renderer, both scenes (city outside / bedroom
+ * Scene manager: owns the renderer, both scenes (city outside / cafe
  * inside), every simulation system and the frame loop.
  *
  * Frame: update systems -> render the city into its own HDR target ->
- * blur / halo passes -> render the bedroom (its glass composites the city) ->
+ * blur / halo passes -> render the cafe (its glass composites the city) ->
  * bloom + tone mapping to the screen.
  */
 export class App {
@@ -66,6 +70,10 @@ export class App {
     this.camera = new PerspectiveCamera(CAMERA.fov, BASE_ASPECT, 0.05, 60);
     this.exteriorCamera = new PerspectiveCamera(CAMERA.fov, BASE_ASPECT, 0.5, 6000);
     this.pointer = { x: 0, y: 0, sx: 0, sy: 0 };
+    this.view = { position: new Vector3(), yaw: 0, pitch: 0, zoom: 1, moved: false };
+    this.keys = new Set();
+    this.drag = null;
+    this.resetView();
     this.placeCameras();
 
     // --- city (exterior scene) -----------------------------------------------------------
@@ -89,12 +97,17 @@ export class App {
       ...this.rain.meshes, ...this.snow.meshes,
     ];
 
-    // --- bedroom (interior scene) -------------------------------------------------------
+    // --- cafe (interior scene) -------------------------------------------------------
     this.interiorScene = new Scene();
     this.room = buildRoom();
     this.glass = new WindowGlass();
     this.room.group.add(...this.glass.meshes);
     this.interiorScene.add(this.room.group);
+    // a neutral studio probe so the steel, brass, marble and glazed ceramics have something to reflect
+    const pmrem = new PMREMGenerator(this.renderer);
+    this.interiorScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.interiorScene.environmentIntensity = 0;
+    pmrem.dispose();
 
     // --- systems ------------------------------------------------------------------------------
     this.time = new TimeSystem(store);
@@ -123,6 +136,19 @@ export class App {
     this.onPointer = this.onPointer.bind(this);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('pointermove', this.onPointer);
+    this.onPointerDown = this.onPointerDown.bind(this);
+    this.onPointerUp = this.onPointerUp.bind(this);
+    this.onWheel = this.onWheel.bind(this);
+    this.onKey = this.onKey.bind(this);
+    this.onBlur = () => this.keys.clear();
+    canvas.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('pointercancel', this.onPointerUp);
+    canvas.addEventListener('wheel', this.onWheel, { passive: false });
+    canvas.addEventListener('dblclick', () => this.resetView());
+    window.addEventListener('keydown', this.onKey);
+    window.addEventListener('keyup', this.onKey);
+    window.addEventListener('blur', this.onBlur);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(stage);
     canvas.addEventListener('webglcontextlost', (e) => {
@@ -138,22 +164,118 @@ export class App {
 
   placeCameras() {
     const p = this.pointer;
-    // a few centimetres of parallax following the pointer makes the depth readable
-    const eye = this.camera.position.copy(this.cameraHome);
-    eye.x += p.sx * 0.05 * 0.68 ;
-    eye.z += p.sx * 0.05 * 0.73;
-    eye.y += p.sy * 0.03;
-    this.camera.lookAt(CAMERA.target);
+    const v = this.view;
+    const eye = this.camera.position.copy(v.position);
+    if (!v.moved) {
+      // a few centimetres of parallax following the pointer makes the depth readable
+      eye.x += p.sx * 0.05 * 0.68;
+      eye.z += p.sx * 0.05 * 0.73;
+      eye.y += p.sy * 0.03;
+    }
+    this.camera.rotation.set(v.pitch, v.yaw, 0, 'YXZ');
     this.exteriorCamera.position.copy(eye);
     this.exteriorCamera.quaternion.copy(this.camera.quaternion);
     this.camera.updateMatrixWorld();
     this.exteriorCamera.updateMatrixWorld();
   }
 
+  /** Back to the framing the scene was composed for. */
+  resetView() {
+    const v = this.view;
+    v.position.copy(this.cameraHome);
+    const d = new Vector3().subVectors(CAMERA.target, this.cameraHome).normalize();
+    v.yaw = Math.atan2(-d.x, -d.z);
+    v.pitch = Math.asin(d.y);
+    v.moved = false;
+    if (v.zoom !== 1) {
+      v.zoom = 1;
+      if (this.quality) this.applyFov();
+    }
+  }
+
+  /** Free look: walk with WASD/arrows (Q/E down/up), kept inside the cafe walls. */
+  moveView(dt) {
+    const k = this.keys;
+    const f = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    const r = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const u = (k.has('KeyE') ? 1 : 0) - (k.has('KeyQ') ? 1 : 0);
+    if (!f && !r && !u) return;
+    const v = this.view;
+    const step = (k.has('ShiftLeft') || k.has('ShiftRight') ? 3.2 : 1.4) * Math.min(dt, 0.1);
+    const sin = Math.sin(v.yaw);
+    const cos = Math.cos(v.yaw);
+    v.position.x += (-sin * f + cos * r) * step;
+    v.position.z += (-cos * f - sin * r) * step;
+    v.position.y += u * step;
+    v.moved = true;
+    this.clampView();
+  }
+
+  clampView() {
+    const pos = this.view.position;
+    const m = 0.22;
+    pos.x = clamp(pos.x, ROOM_ORIGIN.x - ROOM.w + m, ROOM_ORIGIN.x - m);
+    pos.z = clamp(pos.z, ROOM_ORIGIN.z + m, ROOM_ORIGIN.z + ROOM.d - m);
+    pos.y = clamp(pos.y, ROOM_ORIGIN.y + 0.35, ROOM_ORIGIN.y + ROOM.h - 0.3);
+  }
+
   onPointer(e) {
     const rect = this.stage.getBoundingClientRect();
     this.pointer.x = clamp(((e.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1, -1, 1);
     this.pointer.y = clamp(1 - ((e.clientY - rect.top) / Math.max(rect.height, 1)) * 2, -1, 1);
+    const d = this.drag;
+    if (d && d.id === e.pointerId) {
+      // the scene follows the hand: dragging right turns the view left
+      const k = ((this.camera.fov * Math.PI) / 180) / Math.max(rect.height, 1);
+      const v = this.view;
+      v.yaw += (e.clientX - d.x) * k;
+      v.pitch = clamp(v.pitch + (e.clientY - d.y) * k, -1.25, 1.25);
+      v.moved = true;
+      d.x = e.clientX;
+      d.y = e.clientY;
+    }
+  }
+
+  onPointerDown(e) {
+    if (e.button !== 0) return;
+    this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    this.canvas.setPointerCapture?.(e.pointerId);
+    this.canvas.classList.add('dragging');
+  }
+
+  onPointerUp(e) {
+    if (!this.drag || this.drag.id !== e.pointerId) return;
+    this.drag = null;
+    this.canvas.classList.remove('dragging');
+  }
+
+  onWheel(e) {
+    if (e.ctrlKey || e.metaKey) return; // browser zoom
+    e.preventDefault();
+    const v = this.view;
+    // wheels report pixels, lines or pages depending on the device
+    const delta = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    const zoom = clamp(v.zoom * Math.exp(delta * 0.0012), 0.35, 1.5);
+    if (zoom === v.zoom) return;
+    v.zoom = zoom;
+    v.moved = true;
+    this.applyFov();
+  }
+
+  onKey(e) {
+    if (e.type === 'keyup') {
+      this.keys.delete(e.code);
+      return;
+    }
+    const tag = e.target.tagName;
+    if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
+    // focus inside the settings panel: arrows belong to its controls and its scrolling
+    if (e.code.startsWith('Arrow') && e.target.closest?.('#panel')) return;
+    if (e.code === 'KeyR') this.resetView();
+    else if (MOVE_KEYS.has(e.code)) {
+      this.keys.add(e.code);
+      if (e.code.startsWith('Arrow')) e.preventDefault();
+    }
   }
 
   applyQuality() {
@@ -182,20 +304,26 @@ export class App {
     this.bufferHeight = bh;
     this.sizedFor = q;
 
+    this.exterior.setSize(bw, bh, q, this.textureType);
+    this.post.setSize(bw, bh, q, this.textureType);
+    this.glass.setInputs(this.exterior.sceneTexture, this.exterior.mistTexture, this.exterior.haloTexture, bw, bh);
+    this.applyFov();
+  }
+
+  /** Camera projection only: zooming must not touch the render targets. */
+  applyFov() {
     // 16:9 is the reference framing; narrower viewports widen the vertical field of view instead of cropping
-    const aspect = width / height;
+    const aspect = Math.max(1, this.stage.clientWidth) / Math.max(1, this.stage.clientHeight);
     const half = (CAMERA.fov * Math.PI) / 360;
     let fov = CAMERA.fov;
     if (aspect < BASE_ASPECT) fov = Math.min(86, (Math.atan((Math.tan(half) * BASE_ASPECT) / aspect) * 360) / Math.PI);
+    fov = (Math.atan(Math.tan((fov * Math.PI) / 360) * this.view.zoom) * 360) / Math.PI;
     for (const cam of [this.camera, this.exteriorCamera]) {
       cam.fov = fov;
       cam.aspect = aspect;
       cam.updateProjectionMatrix();
     }
-    this.exterior.setSize(bw, bh, q, this.textureType);
-    this.post.setSize(bw, bh, q, this.textureType);
-    this.glass.setInputs(this.exterior.sceneTexture, this.exterior.mistTexture, this.exterior.haloTexture, bw, bh);
-    const pixel = (2 * Math.tan((fov * Math.PI) / 360)) / bh;
+    const pixel = (2 * Math.tan((fov * Math.PI) / 360)) / this.bufferHeight;
     this.rain.setPixelAngle(pixel);
     this.snow.setPixelAngle(pixel);
   }
@@ -250,7 +378,9 @@ export class App {
 
     this.traffic.setEnabled(state.scene.trafficEnabled);
     this.traffic.setDensity(state.scene.trafficDensity / 100);
+    this.closeForNight(state);
     this.lighting.update(dt, simDt, this.time.env, this.weather, this.lightning, state);
+    this.interiorScene.environmentIntensity = 0.015 + this.room.lights.fill.intensity * 0.6;
     this.traffic.update(simDt);
 
     this.rain.update(simDt, wx.rain, wind.x, wind.z);
@@ -263,6 +393,7 @@ export class App {
     const p = this.pointer;
     p.sx = damp(p.sx, p.x, 3, dt);
     p.sy = damp(p.sy, p.y, 3, dt);
+    this.moveView(dt);
     this.placeCameras();
   }
 
@@ -288,7 +419,7 @@ export class App {
       mist: lighting.mistActive, halo: lighting.haloActive, scatter: lighting.scatter,
       haloThreshold: lighting.haloThreshold, haloKnee: 0.5,
     });
-    // 3. the bedroom; the glass panes composite the exterior textures
+    // 3. the cafe; the glass panes composite the exterior textures
     r.shadowMap.needsUpdate = lighting.interiorShadowsDirty;
     lighting.interiorShadowsDirty = false;
     r.setRenderTarget(this.post.target);
@@ -298,6 +429,32 @@ export class App {
   }
 
   /** Skips all running transitions (time easing, weather build-up). Used for testing and captures. */
+  /**
+   * The cafe switches its own lights off at closing time and back on in the morning. The
+   * switches in the panel follow, so anything turned on by hand during the night stays on.
+   */
+  closeForNight(state) {
+    // the selected hour, not the eased clock: an imported configuration is judged by its own time
+    const closed = lateness(state.time.hour % 24) > 0.5;
+    const s = state.scene;
+    // the store remembers the closing, so reloads, imports and resets stay consistent
+    if (closed === s.closedForNight) return;
+    const store = this.store;
+    if (closed) {
+      store.set('scene.resumeInteriorLight', s.interiorLightEnabled);
+      store.set('scene.resumeDeskLamp', s.deskLampEnabled);
+      store.set('scene.resumeScreenBrightness', s.computerScreenBrightness);
+      store.set('scene.interiorLightEnabled', false);
+      store.set('scene.deskLampEnabled', false);
+      store.set('scene.computerScreenBrightness', 0);
+    } else {
+      if (!s.interiorLightEnabled) store.set('scene.interiorLightEnabled', s.resumeInteriorLight);
+      if (!s.deskLampEnabled) store.set('scene.deskLampEnabled', s.resumeDeskLamp);
+      if (s.computerScreenBrightness === 0) store.set('scene.computerScreenBrightness', s.resumeScreenBrightness);
+    }
+    store.set('scene.closedForNight', closed);
+  }
+
   settle() {
     this.time.hour = this.store.state.time.hour % 24;
     Object.assign(this.weather.params, this.weather.resolve());
@@ -308,6 +465,11 @@ export class App {
     this.stop();
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('pointermove', this.onPointer);
+    window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('pointercancel', this.onPointerUp);
+    window.removeEventListener('keydown', this.onKey);
+    window.removeEventListener('keyup', this.onKey);
+    window.removeEventListener('blur', this.onBlur);
     this.resizeObserver.disconnect();
     this.exterior.dispose();
     this.post.dispose();

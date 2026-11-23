@@ -133,6 +133,36 @@ function generateBuildings(rng) {
     const kind = rng.chance(0.5) ? 2 : 1;
     add({ x, z, w: fp, d: fp, h: rng.range(40, 150), rot: rng.range(0, Math.PI), kind, ...styleFor(kind, rng) });
   }
+  // Break up the plain boxes of the taller towers: stepped setbacks, a plant-room
+  // block and a mast. Derived from each tower's own seed so the layout RNG is untouched.
+  const frac = (v) => v - Math.floor(v);
+  for (const b of list.slice()) {
+    if (b.h < 44 || b.shop) continue;
+    const k1 = frac(b.seed * 7.31);
+    const k2 = frac(b.seed * 3.77);
+    const k3 = frac(b.seed * 11.13);
+    let top = b.h;
+    let w = b.w;
+    let d = b.d;
+    if (k1 < 0.6) {
+      const tiers = k2 < 0.4 ? 2 : 1;
+      for (let t = 0; t < tiers; t++) {
+        w *= 0.74;
+        d *= 0.74;
+        top += (5 + 9 * frac(k2 * 13 + t * 0.37)) * (b.h > 90 ? 1.6 : 1);
+        list.push({ ...b, w, d, h: top, seed: b.seed + 0.5 + t });
+      }
+    }
+    const plain = { ...b, style: [99, 999, 0, 0], kind: 1, lit: 0, tint: [b.tint[0] * 0.6 + 0.08, b.tint[1] * 0.6 + 0.08, b.tint[2] * 0.6 + 0.09] };
+    const ox = (k3 - 0.5) * w * 0.3;
+    const oz = (k2 - 0.5) * d * 0.3;
+    const c = Math.cos(b.rot);
+    const sn = Math.sin(b.rot);
+    const px = b.x + ox * c + oz * sn;
+    const pz = b.z - ox * sn + oz * c;
+    list.push({ ...plain, x: px, z: pz, w: w * 0.5, d: d * 0.42, h: top + 3.2 + 2 * k3 });
+    if (k3 > 0.45) list.push({ ...plain, x: px, z: pz, w: 0.7, d: 0.7, h: top + 12 + 26 * k1 * (b.h > 90 ? 1.5 : 1) });
+  }
   // instances are drawn in buffer order: front to back from the fixed camera lets the depth test reject hidden facades
   const toCamera = (b) => Math.hypot(b.x - cam.x, b.z - cam.z) - Math.hypot(b.w, b.d) / 2;
   return list.sort((a, b) => toCamera(a) - toCamera(b));

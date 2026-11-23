@@ -1,5 +1,6 @@
 {
   "name": "cinematic-weather-simulator",
+  "license": "MIT",
   "version": "0.1.0",
   "description": "Cinematic real-time Three.js weather simulator: a bedroom overlooking a living city intersection.",
   "scripts": {

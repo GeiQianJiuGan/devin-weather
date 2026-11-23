@@ -2,7 +2,7 @@ import { LinearFilter, Matrix4, PerspectiveCamera, Vector3, WebGLRenderTarget } 
 import { BlurPyramid, HalfCopy } from './BlurPyramid.js';
 
 // Everything outside the window is rendered into its own HDR target so it can
-// be blurred / diffused independently of the bedroom. The glass shader then
+// be blurred / diffused independently of the cafe. The glass shader then
 // composites the sharp image, the soft-focus copy and the light halos.
 
 const _pos = new Vector3();
